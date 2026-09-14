@@ -15,7 +15,7 @@ export function getUploadRoot() {
 }
 
 export async function ensureUploadDir(...parts: string[]) {
-  const dir = path.join(UPLOAD_ROOT, ...parts);
+  const dir = path.join(/* turbopackIgnore: true */ UPLOAD_ROOT, ...parts);
   await mkdir(dir, { recursive: true });
   return dir;
 }

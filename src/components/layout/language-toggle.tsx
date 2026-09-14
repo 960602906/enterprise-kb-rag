@@ -15,29 +15,26 @@ export function LanguageToggle({ className }: { className?: string }) {
     <div
       role="group"
       aria-label={t("lang.label")}
-      className={cn("inline-flex items-center gap-1.5 text-xs", className)}
+      className={cn(
+        "inline-flex items-center rounded-full bg-muted/80 p-0.5 text-xs",
+        className,
+      )}
     >
-      {OPTIONS.map((opt, i) => (
-        <span key={opt.value} className="inline-flex items-center gap-1.5">
-          {i > 0 ? (
-            <span className="text-muted-foreground/40" aria-hidden>
-              |
-            </span>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setLocale(opt.value)}
-            aria-pressed={locale === opt.value}
-            className={cn(
-              "cursor-pointer rounded-md px-1 py-0.5 transition-colors",
-              locale === opt.value
-                ? "font-semibold text-foreground"
-                : "font-medium text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {opt.label}
-          </button>
-        </span>
+      {OPTIONS.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => setLocale(opt.value)}
+          aria-pressed={locale === opt.value}
+          className={cn(
+            "cursor-pointer rounded-full px-2.5 py-1 transition-colors",
+            locale === opt.value
+              ? "bg-background font-semibold text-foreground shadow-sm"
+              : "font-medium text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {opt.label}
+        </button>
       ))}
     </div>
   );

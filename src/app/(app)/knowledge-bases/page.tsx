@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Loader2, AlertCircle, BookOpen } from "lucide-react";
+import { Plus, Loader2, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState, ErrorState } from "@/components/layout/states";
 import { translateApiError, useI18n } from "@/lib/i18n";
 
 type KnowledgeBase = {
@@ -104,11 +105,13 @@ export default function KnowledgeBasesPage() {
   return (
     <div className="animate-fade-up space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+        <div className="space-y-1.5">
           <h1 className="font-heading text-3xl font-semibold tracking-tight">
             {t("kb.title")}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t("kb.subtitle")}</p>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {t("kb.subtitle")}
+          </p>
         </div>
 
         <Dialog open={open} onOpenChange={setOpen}>
@@ -166,66 +169,72 @@ export default function KnowledgeBasesPage() {
       </div>
 
       {loading && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          {t("kb.loading")}
-        </div>
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {[0, 1, 2, 3].map((i) => (
+            <li
+              key={i}
+              className="surface rounded-2xl p-5"
+              style={{ animationDelay: `${i * 70}ms` }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="h-5 w-40 animate-pulse rounded-md bg-muted" />
+                <div className="h-5 w-12 animate-pulse rounded-full bg-muted" />
+              </div>
+              <div className="mt-3 h-3 w-full animate-pulse rounded bg-muted/80" />
+              <div className="mt-2 h-3 w-2/3 animate-pulse rounded bg-muted/80" />
+            </li>
+          ))}
+        </ul>
       )}
 
       {!loading && error && (
-        <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
-          <AlertCircle className="mt-0.5 size-4 text-destructive" />
-          <div>
-            <p className="font-medium text-destructive">{t("kb.loadFailed")}</p>
-            <p className="mt-1 text-muted-foreground">{error}</p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-3"
-              onClick={() => void load()}
-            >
-              {t("kb.retry")}
-            </Button>
-          </div>
-        </div>
+        <ErrorState title={t("kb.loadFailed")} description={error}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => void load()}
+          >
+            {t("kb.retry")}
+          </Button>
+        </ErrorState>
       )}
 
       {!loading && !error && items.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
-          <BookOpen className="mx-auto size-8 text-muted-foreground/70" />
-          <p className="mt-4 font-heading text-xl font-semibold">
-            {t("kb.emptyTitle")}
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground">{t("kb.emptyBody")}</p>
-          <Button className="mt-6" onClick={() => setOpen(true)}>
+        <EmptyState
+          icon={<BookOpen className="size-5" strokeWidth={1.75} />}
+          title={t("kb.emptyTitle")}
+          description={t("kb.emptyBody")}
+        >
+          <Button onClick={() => setOpen(true)}>
             <Plus data-icon="inline-start" />
             {t("kb.createFirst")}
           </Button>
-        </div>
+        </EmptyState>
       )}
 
       {!loading && !error && items.length > 0 && (
-        <ul className="divide-y divide-border/80 border-y border-border/80">
+        <ul className="grid gap-3 sm:grid-cols-2">
           {items.map((kb) => (
             <li key={kb.id}>
               <Link
                 href={`/knowledge-bases/${kb.id}`}
-                className="group flex items-start justify-between gap-4 py-5 transition-colors hover:bg-muted/40 -mx-2 px-2 rounded-lg"
+                className="group surface flex h-full flex-col rounded-2xl p-5 transition-colors hover:border-border hover:bg-card"
               >
-                <div className="min-w-0">
-                  <p className="font-heading text-lg font-semibold group-hover:text-primary">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-heading text-lg font-semibold tracking-tight group-hover:text-primary">
                     {kb.name}
                   </p>
-                  {kb.description && (
-                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                      {kb.description}
-                    </p>
+                  {kb.role && (
+                    <Badge variant="secondary" className="shrink-0">
+                      {t(kb.role === "manage" ? "roles.manage" : "roles.read")}
+                    </Badge>
                   )}
                 </div>
-                {kb.role && (
-                  <Badge variant="secondary" className="shrink-0">
-                    {t(kb.role === "manage" ? "roles.manage" : "roles.read")}
-                  </Badge>
+                {kb.description && (
+                  <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                    {kb.description}
+                  </p>
                 )}
               </Link>
             </li>

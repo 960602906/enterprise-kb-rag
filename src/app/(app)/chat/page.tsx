@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { EmptyState } from "@/components/layout/states";
 import type { CitationPayload } from "@/lib/db/schema";
 import { translateApiError, useI18n } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 type KnowledgeBase = {
   id: string;
@@ -155,19 +156,21 @@ export default function ChatPage() {
   const busy = status === "streaming" || status === "submitted";
 
   return (
-    <div className="animate-fade-up flex h-[calc(100vh-8rem)] min-h-[520px] flex-col gap-6 lg:flex-row">
-      <div className="flex min-w-0 flex-1 flex-col gap-4">
-        <div>
+    <div className="animate-fade-up flex min-h-[36rem] flex-1 flex-col gap-5 lg:flex-row lg:gap-6">
+      <div className="flex min-w-0 flex-1 flex-col gap-5">
+        <div className="space-y-1.5">
           <h1 className="font-heading text-3xl font-semibold tracking-tight">
             {t("chat.title")}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-sm leading-relaxed text-muted-foreground">
             {t("chat.subtitle")}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-border/80 bg-card/80 p-4">
-          <p className="mb-3 text-sm font-medium">{t("chat.kbs")}</p>
+        <div className="surface rounded-2xl px-4 py-3.5">
+          <p className="mb-2.5 text-xs font-medium tracking-wide text-muted-foreground">
+            {t("chat.kbs")}
+          </p>
           {kbLoading && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />
@@ -184,56 +187,61 @@ export default function ChatPage() {
             <p className="text-sm text-muted-foreground">{t("chat.noKbs")}</p>
           )}
           {!kbLoading && !kbError && kbs.length > 0 && (
-            <div className="flex flex-wrap gap-x-4 gap-y-2">
-              {kbs.map((kb) => (
-                <label
-                  key={kb.id}
-                  className="inline-flex cursor-pointer items-center gap-2 text-sm"
-                >
-                  <input
-                    type="checkbox"
-                    className="size-4 rounded border-border accent-primary"
-                    checked={selected.includes(kb.id)}
-                    onChange={() => toggleKb(kb.id)}
-                  />
-                  <span>{kb.name}</span>
-                </label>
-              ))}
+            <div className="flex flex-wrap gap-2">
+              {kbs.map((kb) => {
+                const on = selected.includes(kb.id);
+                return (
+                  <button
+                    key={kb.id}
+                    type="button"
+                    onClick={() => toggleKb(kb.id)}
+                    aria-pressed={on}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                      on
+                        ? "border-foreground/15 bg-foreground text-background"
+                        : "border-border/80 bg-background/50 text-muted-foreground hover:border-border hover:text-foreground",
+                    )}
+                  >
+                    {kb.name}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card/70">
-          <ScrollArea className="flex-1 px-4 py-4">
+        <div className="surface flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
+          <ScrollArea className="flex-1 px-5 py-5">
             {messages.length === 0 ? (
-              <div className="flex h-64 flex-col items-center justify-center text-center">
-                <BookMarked className="size-8 text-muted-foreground/60" />
-                <p className="mt-4 font-heading text-lg font-semibold">
-                  {t("chat.emptyTitle")}
-                </p>
-                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                  {t("chat.emptyBody")}
-                </p>
-              </div>
+              <EmptyState
+                icon={<BookMarked className="size-5" strokeWidth={1.75} />}
+                title={t("chat.emptyTitle")}
+                description={t("chat.emptyBody")}
+                className="h-64 border-0 bg-transparent py-0"
+              />
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {messages.map((m) => {
                   const text = messageText(m);
                   const isUser = m.role === "user";
                   return (
                     <div
                       key={m.id}
-                      className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                      className={cn(
+                        "flex",
+                        isUser ? "justify-end" : "justify-start",
+                      )}
                     >
-                      <div
-                        className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
-                          isUser
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted/80 text-foreground"
-                        }`}
-                      >
-                        {text || (busy && !isUser ? "…" : "")}
-                      </div>
+                      {isUser ? (
+                        <div className="max-w-[80%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap text-primary-foreground">
+                          {text}
+                        </div>
+                      ) : (
+                        <div className="max-w-[90%] text-sm leading-7 whitespace-pre-wrap text-foreground">
+                          {text || (busy ? "…" : "")}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -248,21 +256,21 @@ export default function ChatPage() {
           </ScrollArea>
 
           {error && (
-            <p className="border-t border-border/60 px-4 py-2 text-xs text-destructive">
+            <p className="border-t border-border/50 px-5 py-2.5 text-xs text-destructive">
               {translateApiError(t, error.message, "chat.failed")}
             </p>
           )}
 
           <form
             onSubmit={onSubmit}
-            className="flex items-end gap-2 border-t border-border/60 p-3"
+            className="flex flex-col gap-2 border-t border-border/50 p-3.5 sm:flex-row sm:items-end"
           >
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={t("chat.placeholder")}
               rows={2}
-              className="min-h-[64px] resize-none"
+              className="min-h-[68px] flex-1 resize-none"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -270,15 +278,7 @@ export default function ChatPage() {
                 }
               }}
             />
-            <div className="flex flex-col gap-2">
-              <Button type="submit" disabled={busy || !input.trim()} size="lg">
-                {busy ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
-                  <Send data-icon="inline-start" />
-                )}
-                {t("chat.send")}
-              </Button>
+            <div className="flex items-center justify-end gap-2">
               {messages.length > 0 && (
                 <Button
                   type="button"
@@ -292,29 +292,40 @@ export default function ChatPage() {
                   {t("chat.clear")}
                 </Button>
               )}
+              <Button type="submit" disabled={busy || !input.trim()}>
+                {busy ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <Send data-icon="inline-start" />
+                )}
+                {t("chat.send")}
+              </Button>
             </div>
           </form>
         </div>
       </div>
 
-      <aside className="flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card/80 lg:w-80">
-        <div className="border-b border-border/60 px-4 py-3">
-          <h2 className="font-heading text-lg font-semibold">
+      <aside className="surface flex w-full shrink-0 flex-col overflow-hidden rounded-2xl lg:w-80">
+        <div className="border-b border-border/50 px-5 py-4">
+          <h2 className="font-heading text-lg font-semibold tracking-tight">
             {t("chat.citations")}
           </h2>
-          <p className="text-xs text-muted-foreground">
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
             {t("chat.citationsSubtitle")}
           </p>
         </div>
         <ScrollArea className="flex-1 p-4">
           {citations.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="px-1 text-sm leading-relaxed text-muted-foreground">
               {t("chat.citationsEmpty")}
             </p>
           ) : (
-            <ol className="space-y-4">
+            <ol className="space-y-3">
               {citations.map((c, i) => (
-                <li key={`${c.chunkId}-${i}`} className="text-sm">
+                <li
+                  key={`${c.chunkId}-${i}`}
+                  className="rounded-xl border border-border/50 bg-background/50 p-3.5 text-sm"
+                >
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">[{i + 1}]</Badge>
                     <span className="font-medium">{c.documentTitle}</span>
@@ -332,7 +343,6 @@ export default function ChatPage() {
                   <p className="mt-2 leading-relaxed text-muted-foreground">
                     {c.snippet}
                   </p>
-                  {i < citations.length - 1 && <Separator className="mt-4" />}
                 </li>
               ))}
             </ol>

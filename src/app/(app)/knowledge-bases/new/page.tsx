@@ -45,22 +45,23 @@ export default function NewKnowledgeBasePage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg animate-fade-up space-y-6">
+    <div className="mx-auto w-full max-w-lg animate-fade-up space-y-8">
       <Link
         href="/knowledge-bases"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
         {t("kb.back")}
       </Link>
-      <div>
-        <h1 className="font-heading text-3xl font-semibold">{t("kb.newTitle")}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t("kb.newSubtitle")}</p>
+      <div className="space-y-1.5">
+        <h1 className="font-heading text-3xl font-semibold tracking-tight">
+          {t("kb.newTitle")}
+        </h1>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {t("kb.newSubtitle")}
+        </p>
       </div>
-      <form
-        onSubmit={onSubmit}
-        className="space-y-4 rounded-2xl border border-border/80 bg-card/80 p-6"
-      >
+      <form onSubmit={onSubmit} className="surface space-y-5 rounded-2xl p-6 sm:p-7">
         <div className="space-y-2">
           <Label htmlFor="name">{t("kb.name")}</Label>
           <Input

@@ -13,26 +13,38 @@ type Mode = "login" | "register";
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const form = e.currentTarget;
+    const data = new FormData(form);
+    const email = String(data.get("email") ?? "").trim();
+    const password = String(data.get("password") ?? "");
+    const name = String(data.get("name") ?? "").trim();
+
+    if (!email || !password) {
+      toast.error("Email and password are required / 请填写邮箱和密码");
+      return;
+    }
+
     setLoading(true);
     try {
       if (mode === "register") {
         const res = await fetch("/api/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, name: name || undefined }),
+          body: JSON.stringify({
+            email,
+            password,
+            name: name || undefined,
+          }),
         });
-        const data = await res.json().catch(() => ({}));
+        const body = await res.json().catch(() => ({}));
         if (!res.ok) {
           toast.error(
-            typeof data.error === "string"
-              ? data.error
+            typeof body.error === "string"
+              ? body.error
               : "Registration failed / 注册失败",
           );
           return;
@@ -103,14 +115,18 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <form onSubmit={onSubmit} className="space-y-4">
+          <form
+            key={mode}
+            onSubmit={onSubmit}
+            className="space-y-4"
+            noValidate={false}
+          >
             {mode === "register" && (
               <div className="space-y-2 animate-fade-in">
                 <Label htmlFor="name">Name / 姓名</Label>
                 <Input
                   id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  name="name"
                   placeholder="Optional / 可选"
                   autoComplete="name"
                 />
@@ -120,10 +136,9 @@ export default function LoginPage() {
               <Label htmlFor="email">Email / 邮箱</Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
                 autoComplete="email"
               />
@@ -132,11 +147,10 @@ export default function LoginPage() {
               <Label htmlFor="password">Password / 密码</Label>
               <Input
                 id="password"
+                name="password"
                 type="password"
                 required
                 minLength={mode === "register" ? 8 : 6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
                 placeholder={
                   mode === "register" ? "At least 8 characters" : "••••••••"
                 }

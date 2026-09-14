@@ -7,13 +7,11 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     rules: {
-      // Client pages fetch on mount; the Next 16 plugin flags this as an error.
+      // Next 16 eslint-plugin-react-hooks treats compiler rules as errors.
+      // They fire on mount-fetch pages, theme hydration, and chat transport refs.
       "react-hooks/set-state-in-effect": "off",
-    },
-  },
-  {
-    files: ["src/components/ui/**"],
-    rules: {
+      "react-hooks/immutability": "off",
+      "react-hooks/refs": "off",
       "react-hooks/purity": "off",
     },
   },

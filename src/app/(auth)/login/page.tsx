@@ -1,85 +1,36 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { useActionState, useState } from "react";
+import { loginAction, registerAction, type AuthFormState } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type Mode = "login" | "register";
+const initialState: AuthFormState = {};
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [mode, setMode] = useState<Mode>("login");
-  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [loginState, loginFormAction, loginPending] = useActionState(
+    loginAction,
+    initialState,
+  );
+  const [registerState, registerFormAction, registerPending] = useActionState(
+    registerAction,
+    initialState,
+  );
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const data = new FormData(form);
-    const email = String(data.get("email") ?? "").trim();
-    const password = String(data.get("password") ?? "");
-    const name = String(data.get("name") ?? "").trim();
-
-    if (!email || !password) {
-      toast.error("Email and password are required / 请填写邮箱和密码");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      if (mode === "register") {
-        const res = await fetch("/api/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email,
-            password,
-            name: name || undefined,
-          }),
-        });
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          toast.error(
-            typeof body.error === "string"
-              ? body.error
-              : "Registration failed / 注册失败",
-          );
-          return;
-        }
-        toast.success("Account created / 账号已创建");
-      }
-
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        toast.error("Invalid email or password / 邮箱或密码错误");
-        return;
-      }
-
-      router.push("/knowledge-bases");
-      router.refresh();
-    } catch {
-      toast.error("Something went wrong / 出错了");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const pending = mode === "login" ? loginPending : registerPending;
+  const state = mode === "login" ? loginState : registerState;
+  const action = mode === "login" ? loginFormAction : registerFormAction;
 
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center px-4 py-16">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-72 animate-soft-pulse bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--atmosphere-to)_55%,transparent),transparent_70%)]"
+        className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--atmosphere-to)_55%,transparent),transparent_70%)]"
       />
 
-      <div className="relative z-10 w-full max-w-md animate-fade-up">
+      <div className="relative z-10 w-full max-w-md">
         <div className="mb-10 text-center">
           <p className="font-heading text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
             Atlas KB
@@ -115,14 +66,13 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <form
-            key={mode}
-            onSubmit={onSubmit}
-            className="space-y-4"
-            noValidate={false}
-          >
+          {/*
+            Progressive enhancement: form action is a Server Action.
+            Works even if client JS/hydration fails (native POST to RSC endpoint).
+          */}
+          <form key={mode} action={action} method="post" className="space-y-4">
             {mode === "register" && (
-              <div className="space-y-2 animate-fade-in">
+              <div className="space-y-2">
                 <Label htmlFor="name">Name / 姓名</Label>
                 <Input
                   id="name"
@@ -159,8 +109,18 @@ export default function LoginPage() {
                 }
               />
             </div>
-            <Button type="submit" className="w-full" size="lg" disabled={loading}>
-              {loading
+
+            {state?.error ? (
+              <p
+                role="alert"
+                className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
+                {state.error}
+              </p>
+            ) : null}
+
+            <Button type="submit" className="w-full" size="lg" disabled={pending}>
+              {pending
                 ? "Please wait… / 请稍候…"
                 : mode === "login"
                   ? "Continue / 继续"

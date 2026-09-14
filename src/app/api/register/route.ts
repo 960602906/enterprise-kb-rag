@@ -4,6 +4,12 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import {
+  clientIp,
+  envInt,
+  hitRateLimit,
+  rateLimitedResponse,
+} from "@/lib/rate-limit";
 
 const schema = z.object({
   email: z.string().email(),
@@ -22,6 +28,12 @@ export async function POST(req: Request) {
       { status: 403 },
     );
   }
+
+  const limited = hitRateLimit({
+    key: `register:${clientIp(req)}`,
+    limit: envInt("REGISTER_RATE_LIMIT_PER_MIN", 5),
+  });
+  if (!limited.ok) return rateLimitedResponse(limited);
 
   try {
     const body = schema.parse(await req.json());

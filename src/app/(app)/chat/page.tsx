@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { toast } from "sonner";
@@ -187,7 +188,12 @@ export default function ChatPage() {
             </div>
           )}
           {!kbLoading && !kbError && kbs.length === 0 && (
-            <p className="text-sm text-muted-foreground">{t("chat.noKbs")}</p>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">{t("chat.noKbs")}</p>
+              <Button asChild size="sm">
+                <Link href="/knowledge-bases/new">{t("chat.noKbsCta")}</Link>
+              </Button>
+            </div>
           )}
           {!kbLoading && !kbError && kbs.length > 0 && (
             <div className="flex flex-wrap gap-2">

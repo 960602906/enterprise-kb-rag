@@ -20,10 +20,15 @@ export {
   isCjkHeavyQuery,
   buildContextBlock,
   makeSnippet,
+  reciprocalRankScore,
   type RetrievedChunk,
 } from "./retrieve";
 export { expandSynonymTerms, loadSynonymBags } from "./synonyms";
-export { getRetrievalConfig, type RetrievalConfig } from "./retrieval-config";
+export {
+  getRetrievalConfig,
+  type RetrievalConfig,
+  type RetrievalFusion,
+} from "./retrieval-config";
 export { assertChunksPermitted } from "./acl-chunks";
 export {
   processDocument,

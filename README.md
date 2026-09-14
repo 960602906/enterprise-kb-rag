@@ -51,6 +51,8 @@ Default seed users (override with `SEED_*`):
 
 Seed also creates **Employee Handbook** (demo) and **Internal Docs** (default SearchKnowledge target; override name with `SEARCH_KNOWLEDGE_DEFAULT_KB_NAME`).
 
+`pnpm db:migrate` also enables `pg_trgm` and `chunks_content_trgm_idx` (needed for CJK keyword scoring).
+
 ### 4. Run
 
 ```bash
@@ -81,6 +83,9 @@ Open [http://localhost:43123](http://localhost:43123).
 | `INGEST_WORKER_INLINE` | `true` to process in-request (dev default); `false` in production |
 | `INGEST_BATCH_SIZE` | Docs per drain tick (default 3 on Cron, 10 on CLI worker) |
 | `INGEST_LOCK_TTL_MS` | Reclaim `running` jobs after this many ms (default 180000) |
+| `RETRIEVAL_FUSION` | `rrf` (default) or `weighted` |
+| `RETRIEVAL_RRF_K` | RRF constant (default 60) |
+| `RETRIEVAL_TRGM_MIN_SIMILARITY` | CJK / fuzzy keyword floor (default 0.35) |
 | `SEARCH_KNOWLEDGE_API_KEY` | Service SearchKnowledge header `x-api-key` |
 | `SEARCH_KNOWLEDGE_KB_IDS` | Comma-separated KB UUID allowlist for that key |
 | `SEARCH_KNOWLEDGE_DEFAULT_KB_NAME` | Used when the request omits ids and KB_IDS is unset (default `Internal Docs`) |
@@ -107,6 +112,14 @@ Hybrid keyword retrieval expands queries from JSON bags, not hard-coded product 
 
 `match` is a case-insensitive JS regex. Invalid bags are skipped at load time.
 
+## Hybrid retrieval
+
+1. Vector candidates: cosine distance on `chunks.embedding`
+2. Keyword candidates: english `tsvector` **unless** the query is CJK-heavy (then FTS is skipped). CJK / fuzzy matches use `pg_trgm` `word_similarity` plus ILIKE bigrams.
+3. Fusion: **RRF** by default (`score = w / (k + rank)` per list). Set `RETRIEVAL_FUSION=weighted` for the old min-max mix.
+
+Knobs live in [`config/retrieval.json`](./config/retrieval.json).
+
 ## OpenAI or Vercel AI Gateway keys
 
 **OpenAI**
@@ -126,8 +139,8 @@ Without keys, set `MOCK_CHAT=true` and `MOCK_EMBEDDINGS=true` for deterministic 
 ## Deploy on Vercel (Neon / Supabase)
 
 1. Create a **pgvector-enabled** Postgres database:
-   - [Neon](https://neon.tech): enable the `vector` extension
-   - [Supabase](https://supabase.com): `create extension if not exists vector;`
+   - [Neon](https://neon.tech): enable the `vector` and `pg_trgm` extensions (or run `pnpm db:migrate`)
+   - [Supabase](https://supabase.com): `create extension if not exists vector; create extension if not exists pg_trgm;`
 2. Set `DATABASE_URL` (pooled URL for the app; direct URL for migrations if needed)
 3. Set `AUTH_SECRET`, `AUTH_URL` (production URL), and model keys
 4. Run `pnpm db:migrate` against the remote DB

@@ -22,3 +22,8 @@ const client = postgres(connectionString ?? "postgres://localhost:5432/kb_rag", 
 export const db = drizzle(client, { schema });
 export type Database = typeof db;
 export { schema };
+
+/** Close the postgres-js pool so tsx/node scripts can exit. */
+export async function closeDb(): Promise<void> {
+  await client.end({ timeout: 5 });
+}

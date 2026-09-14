@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { CitationPayload } from "@/lib/db/schema";
+import { translateApiError, useI18n } from "@/lib/i18n";
 
 type KnowledgeBase = {
   id: string;
@@ -55,6 +56,11 @@ function extractCitations(message: {
 }
 
 export default function ChatPage() {
+  const { t } = useI18n();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
   const [kbs, setKbs] = useState<KnowledgeBase[]>([]);
   const [kbLoading, setKbLoading] = useState(true);
   const [kbError, setKbError] = useState<string | null>(null);
@@ -80,7 +86,7 @@ export default function ChatPage() {
   const { messages, sendMessage, status, error, setMessages } = useChat({
     transport,
     onError: (err) => {
-      toast.error(err.message || "Chat failed / 对话失败");
+      toast.error(translateApiError(tRef.current, err.message, "chat.failed"));
     },
     onFinish: ({ message }) => {
       const next = extractCitations(message);
@@ -102,14 +108,22 @@ export default function ChatPage() {
     try {
       const res = await fetch("/api/knowledge-bases");
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to load");
+      if (!res.ok) {
+        throw new Error(
+          translateApiError(tRef.current, data.error, "errors.loadFailed"),
+        );
+      }
       const items = (data.items ?? []) as KnowledgeBase[];
       setKbs(items);
       setSelected((prev) =>
         prev.length ? prev.filter((id) => items.some((k) => k.id === id)) : [],
       );
     } catch (err) {
-      setKbError(err instanceof Error ? err.message : "Failed to load");
+      setKbError(
+        err instanceof Error
+          ? err.message
+          : tRef.current("errors.loadFailed"),
+      );
     } finally {
       setKbLoading(false);
     }
@@ -130,7 +144,7 @@ export default function ChatPage() {
     const text = input.trim();
     if (!text || status === "streaming" || status === "submitted") return;
     if (selected.length === 0) {
-      toast.error("Select at least one knowledge base / 请至少选择一个知识库");
+      toast.error(t("chat.selectKb"));
       return;
     }
     setInput("");
@@ -145,19 +159,19 @@ export default function ChatPage() {
       <div className="flex min-w-0 flex-1 flex-col gap-4">
         <div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight">
-            Chat
+            {t("chat.title")}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            问答 · Ask with citations from selected knowledge bases
+            {t("chat.subtitle")}
           </p>
         </div>
 
         <div className="rounded-2xl border border-border/80 bg-card/80 p-4">
-          <p className="mb-3 text-sm font-medium">Knowledge bases / 知识库</p>
+          <p className="mb-3 text-sm font-medium">{t("chat.kbs")}</p>
           {kbLoading && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />
-              Loading…
+              {t("chat.loading")}
             </div>
           )}
           {!kbLoading && kbError && (
@@ -167,9 +181,7 @@ export default function ChatPage() {
             </div>
           )}
           {!kbLoading && !kbError && kbs.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No accessible knowledge bases. Create one first.
-            </p>
+            <p className="text-sm text-muted-foreground">{t("chat.noKbs")}</p>
           )}
           {!kbLoading && !kbError && kbs.length > 0 && (
             <div className="flex flex-wrap gap-x-4 gap-y-2">
@@ -197,10 +209,10 @@ export default function ChatPage() {
               <div className="flex h-64 flex-col items-center justify-center text-center">
                 <BookMarked className="size-8 text-muted-foreground/60" />
                 <p className="mt-4 font-heading text-lg font-semibold">
-                  Ask your knowledge base
+                  {t("chat.emptyTitle")}
                 </p>
                 <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                  选择知识库后提问 — answers cite source snippets and pages
+                  {t("chat.emptyBody")}
                 </p>
               </div>
             ) : (
@@ -228,7 +240,7 @@ export default function ChatPage() {
                 {busy && messages[messages.length - 1]?.role === "user" && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="size-4 animate-spin" />
-                    Retrieving & answering…
+                    {t("chat.retrieving")}
                   </div>
                 )}
               </div>
@@ -237,7 +249,7 @@ export default function ChatPage() {
 
           {error && (
             <p className="border-t border-border/60 px-4 py-2 text-xs text-destructive">
-              {error.message}
+              {translateApiError(t, error.message, "chat.failed")}
             </p>
           )}
 
@@ -248,7 +260,7 @@ export default function ChatPage() {
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask a question… / 输入问题…"
+              placeholder={t("chat.placeholder")}
               rows={2}
               className="min-h-[64px] resize-none"
               onKeyDown={(e) => {
@@ -265,7 +277,7 @@ export default function ChatPage() {
                 ) : (
                   <Send data-icon="inline-start" />
                 )}
-                Send
+                {t("chat.send")}
               </Button>
               {messages.length > 0 && (
                 <Button
@@ -277,7 +289,7 @@ export default function ChatPage() {
                     setCitations([]);
                   }}
                 >
-                  Clear
+                  {t("chat.clear")}
                 </Button>
               )}
             </div>
@@ -287,15 +299,17 @@ export default function ChatPage() {
 
       <aside className="flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card/80 lg:w-80">
         <div className="border-b border-border/60 px-4 py-3">
-          <h2 className="font-heading text-lg font-semibold">Citations / 引用</h2>
+          <h2 className="font-heading text-lg font-semibold">
+            {t("chat.citations")}
+          </h2>
           <p className="text-xs text-muted-foreground">
-            Source snippets for the latest answer
+            {t("chat.citationsSubtitle")}
           </p>
         </div>
         <ScrollArea className="flex-1 p-4">
           {citations.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Citations appear after you ask a question.
+              {t("chat.citationsEmpty")}
             </p>
           ) : (
             <ol className="space-y-4">
@@ -306,7 +320,7 @@ export default function ChatPage() {
                     <span className="font-medium">{c.documentTitle}</span>
                     {c.pageNumber != null && (
                       <span className="text-xs text-muted-foreground">
-                        p.{c.pageNumber}
+                        {t("chat.page", { n: c.pageNumber })}
                       </span>
                     )}
                   </div>

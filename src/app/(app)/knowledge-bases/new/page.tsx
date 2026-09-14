@@ -9,8 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { translateApiError, useI18n } from "@/lib/i18n";
 
 export default function NewKnowledgeBasePage() {
+  const { t } = useI18n();
   const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -30,15 +32,13 @@ export default function NewKnowledgeBasePage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(
-          typeof data.error === "string" ? data.error : "Create failed",
-        );
+        toast.error(translateApiError(t, data.error, "kb.createFailed"));
         return;
       }
-      toast.success("Created / 已创建");
+      toast.success(t("kb.created"));
       router.push(`/knowledge-bases/${data.item.id}`);
     } catch {
-      toast.error("Create failed / 创建失败");
+      toast.error(t("kb.createFailed"));
     } finally {
       setCreating(false);
     }
@@ -51,18 +51,18 @@ export default function NewKnowledgeBasePage() {
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
-        Back
+        {t("kb.back")}
       </Link>
       <div>
-        <h1 className="font-heading text-3xl font-semibold">New knowledge base</h1>
-        <p className="mt-1 text-sm text-muted-foreground">新建知识库</p>
+        <h1 className="font-heading text-3xl font-semibold">{t("kb.newTitle")}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t("kb.newSubtitle")}</p>
       </div>
       <form
         onSubmit={onSubmit}
         className="space-y-4 rounded-2xl border border-border/80 bg-card/80 p-6"
       >
         <div className="space-y-2">
-          <Label htmlFor="name">Name / 名称</Label>
+          <Label htmlFor="name">{t("kb.name")}</Label>
           <Input
             id="name"
             value={name}
@@ -72,7 +72,7 @@ export default function NewKnowledgeBasePage() {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="desc">Description / 描述</Label>
+          <Label htmlFor="desc">{t("kb.description")}</Label>
           <Textarea
             id="desc"
             value={description}
@@ -85,10 +85,10 @@ export default function NewKnowledgeBasePage() {
           {creating ? (
             <>
               <Loader2 className="animate-spin" />
-              Creating…
+              {t("kb.creating")}
             </>
           ) : (
-            "Create / 创建"
+            t("kb.create")
           )}
         </Button>
       </form>

@@ -5,10 +5,13 @@ import { loginAction, registerAction, type AuthFormState } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LanguageToggle } from "@/components/layout/language-toggle";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 
 const initialState: AuthFormState = {};
 
 export default function LoginPage() {
+  const { t } = useI18n();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [loginState, loginFormAction, loginPending] = useActionState(
     loginAction,
@@ -30,13 +33,17 @@ export default function LoginPage() {
         className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--atmosphere-to)_55%,transparent),transparent_70%)]"
       />
 
+      <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
+        <LanguageToggle />
+      </div>
+
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-10 text-center">
           <p className="font-heading text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            Atlas KB
+            {t("brand.name")}
           </p>
           <p className="mt-3 text-sm text-muted-foreground">
-            Enterprise knowledge Q&amp;A · 企业知识库问答
+            {t("brand.tagline")}
           </p>
         </div>
 
@@ -51,7 +58,7 @@ export default function LoginPage() {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              Sign in / 登录
+              {t("auth.signIn")}
             </button>
             <button
               type="button"
@@ -62,7 +69,7 @@ export default function LoginPage() {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              Register / 注册
+              {t("auth.register")}
             </button>
           </div>
 
@@ -73,17 +80,17 @@ export default function LoginPage() {
           <form key={mode} action={action} method="post" className="space-y-4">
             {mode === "register" && (
               <div className="space-y-2">
-                <Label htmlFor="name">Name / 姓名</Label>
+                <Label htmlFor="name">{t("auth.name")}</Label>
                 <Input
                   id="name"
                   name="name"
-                  placeholder="Optional / 可选"
+                  placeholder={t("auth.namePlaceholder")}
                   autoComplete="name"
                 />
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email / 邮箱</Label>
+              <Label htmlFor="email">{t("auth.email")}</Label>
               <Input
                 id="email"
                 name="email"
@@ -94,7 +101,7 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password / 密码</Label>
+              <Label htmlFor="password">{t("auth.password")}</Label>
               <Input
                 id="password"
                 name="password"
@@ -102,7 +109,7 @@ export default function LoginPage() {
                 required
                 minLength={mode === "register" ? 8 : 6}
                 placeholder={
-                  mode === "register" ? "At least 8 characters" : "••••••••"
+                  mode === "register" ? t("auth.passwordMin") : "••••••••"
                 }
                 autoComplete={
                   mode === "register" ? "new-password" : "current-password"
@@ -115,22 +122,22 @@ export default function LoginPage() {
                 role="alert"
                 className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
               >
-                {state.error}
+                {t(`auth.errors.${state.error}` as MessageKey)}
               </p>
             ) : null}
 
             <Button type="submit" className="w-full" size="lg" disabled={pending}>
               {pending
-                ? "Please wait… / 请稍候…"
+                ? t("auth.wait")
                 : mode === "login"
-                  ? "Continue / 继续"
-                  : "Create account / 创建账号"}
+                  ? t("auth.continue")
+                  : t("auth.createAccount")}
             </Button>
           </form>
         </div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          Internal use only · 仅限企业内部使用
+          {t("brand.internalUse")}
         </p>
       </div>
     </main>

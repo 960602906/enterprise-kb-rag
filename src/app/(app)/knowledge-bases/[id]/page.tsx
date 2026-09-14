@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { translateApiError, useI18n, type TranslateFn } from "@/lib/i18n";
 
 type DocStatus = "pending" | "processing" | "ready" | "failed";
 
@@ -63,14 +64,25 @@ const statusVariant: Record<
   failed: "destructive",
 };
 
-const statusLabel: Record<DocStatus, string> = {
-  pending: "pending / 待处理",
-  processing: "processing / 处理中",
-  ready: "ready / 就绪",
-  failed: "failed / 失败",
-};
+function statusLabel(t: TranslateFn, status: DocStatus): string {
+  switch (status) {
+    case "pending":
+      return t("docs.status.pending");
+    case "processing":
+      return t("docs.status.processing");
+    case "ready":
+      return t("docs.status.ready");
+    case "failed":
+      return t("docs.status.failed");
+  }
+}
 
 export default function KnowledgeBaseDetailPage() {
+  const { t } = useI18n();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
@@ -100,7 +112,11 @@ export default function KnowledgeBaseDetailPage() {
         fetch(`/api/knowledge-bases/${id}/members`),
       ]);
       const kbData = await kbRes.json();
-      if (!kbRes.ok) throw new Error(kbData.error ?? "Failed to load KB");
+      if (!kbRes.ok) {
+        throw new Error(
+          translateApiError(tRef.current, kbData.error, "errors.loadFailed"),
+        );
+      }
       setKb(kbData.item);
       setDocuments(kbData.documents ?? []);
 
@@ -109,7 +125,11 @@ export default function KnowledgeBaseDetailPage() {
         setMembers(mData.members ?? []);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
+      setError(
+        err instanceof Error
+          ? err.message
+          : tRef.current("errors.loadFailed"),
+      );
     } finally {
       setLoading(false);
     }
@@ -146,17 +166,15 @@ export default function KnowledgeBaseDetailPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(
-          typeof data.error === "string" ? data.error : "Upload failed",
-        );
+        toast.error(translateApiError(t, data.error, "docs.uploadFailed"));
         return;
       }
-      toast.success("Uploaded / 已上传");
+      toast.success(t("docs.uploaded"));
       setFile(null);
       setTitle("");
       await load();
     } catch {
-      toast.error("Upload failed / 上传失败");
+      toast.error(t("docs.uploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -171,15 +189,13 @@ export default function KnowledgeBaseDetailPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(
-          typeof data.error === "string" ? data.error : "Process failed",
-        );
+        toast.error(translateApiError(t, data.error, "docs.processFailed"));
         return;
       }
-      toast.success("Processed / 处理完成");
+      toast.success(t("docs.processed"));
       await load();
     } catch {
-      toast.error("Process failed / 处理失败");
+      toast.error(t("docs.processFailed"));
     } finally {
       setProcessingId(null);
     }
@@ -187,22 +203,20 @@ export default function KnowledgeBaseDetailPage() {
 
   async function deleteDoc(docId: string) {
     if (!canManage) return;
-    if (!confirm("Delete this document? / 删除该文档？")) return;
+    if (!confirm(t("docs.confirmDelete"))) return;
     try {
       const res = await fetch(`/api/documents/${docId}/process`, {
         method: "DELETE",
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toast.error(
-          typeof data.error === "string" ? data.error : "Delete failed",
-        );
+        toast.error(translateApiError(t, data.error, "docs.deleteFailed"));
         return;
       }
-      toast.success("Deleted / 已删除");
+      toast.success(t("docs.deleted"));
       await load();
     } catch {
-      toast.error("Delete failed");
+      toast.error(t("docs.deleteFailed"));
     }
   }
 
@@ -221,14 +235,14 @@ export default function KnowledgeBaseDetailPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(typeof data.error === "string" ? data.error : "Add failed");
+        toast.error(translateApiError(t, data.error, "members.addFailed"));
         return;
       }
-      toast.success("Member added / 成员已添加");
+      toast.success(t("members.added"));
       setMemberEmail("");
       await load();
     } catch {
-      toast.error("Add failed");
+      toast.error(t("members.addFailed"));
     } finally {
       setAddingMember(false);
     }
@@ -236,7 +250,7 @@ export default function KnowledgeBaseDetailPage() {
 
   async function removeMember(userId: string) {
     if (!canManage) return;
-    if (!confirm("Remove this member? / 移除该成员？")) return;
+    if (!confirm(t("members.confirmRemove"))) return;
     try {
       const res = await fetch(`/api/knowledge-bases/${id}/members`, {
         method: "DELETE",
@@ -245,25 +259,19 @@ export default function KnowledgeBaseDetailPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toast.error(
-          typeof data.error === "string" ? data.error : "Remove failed",
-        );
+        toast.error(translateApiError(t, data.error, "members.removeFailed"));
         return;
       }
-      toast.success("Removed / 已移除");
+      toast.success(t("members.removed"));
       await load();
     } catch {
-      toast.error("Remove failed");
+      toast.error(t("members.removeFailed"));
     }
   }
 
   async function deleteKb() {
     if (!canManage) return;
-    if (
-      !confirm(
-        "Delete this knowledge base and all documents? / 删除知识库及全部文档？",
-      )
-    ) {
+    if (!confirm(t("kb.confirmDelete"))) {
       return;
     }
     setDeleting(true);
@@ -273,15 +281,13 @@ export default function KnowledgeBaseDetailPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toast.error(
-          typeof data.error === "string" ? data.error : "Delete failed",
-        );
+        toast.error(translateApiError(t, data.error, "docs.deleteFailed"));
         return;
       }
-      toast.success("Knowledge base deleted");
+      toast.success(t("kb.deleted"));
       router.push("/knowledge-bases");
     } catch {
-      toast.error("Delete failed");
+      toast.error(t("docs.deleteFailed"));
     } finally {
       setDeleting(false);
     }
@@ -291,7 +297,7 @@ export default function KnowledgeBaseDetailPage() {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />
-        Loading knowledge base…
+        {t("kb.loadingDetail")}
       </div>
     );
   }
@@ -301,12 +307,12 @@ export default function KnowledgeBaseDetailPage() {
       <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
         <AlertCircle className="mt-0.5 size-4 text-destructive" />
         <div>
-          <p className="font-medium text-destructive">
-            Could not load / 加载失败
+          <p className="font-medium text-destructive">{t("kb.loadFailed")}</p>
+          <p className="mt-1 text-muted-foreground">
+            {error ?? t("kb.notFound")}
           </p>
-          <p className="mt-1 text-muted-foreground">{error ?? "Not found"}</p>
           <Button variant="outline" size="sm" className="mt-3" asChild>
-            <Link href="/knowledge-bases">Back</Link>
+            <Link href="/knowledge-bases">{t("kb.back")}</Link>
           </Button>
         </div>
       </div>
@@ -321,7 +327,7 @@ export default function KnowledgeBaseDetailPage() {
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" />
-          Knowledge Bases
+          {t("nav.knowledgeBases")}
         </Link>
         <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -333,8 +339,10 @@ export default function KnowledgeBaseDetailPage() {
                 {kb.description}
               </p>
             )}
-            <Badge variant="secondary" className="mt-3 capitalize">
-              Your role: {kb.role}
+            <Badge variant="secondary" className="mt-3">
+              {t("kb.yourRole", {
+                role: t(kb.role === "manage" ? "roles.manage" : "roles.read"),
+              })}
             </Badge>
           </div>
           {canManage && (
@@ -349,7 +357,7 @@ export default function KnowledgeBaseDetailPage() {
               ) : (
                 <Trash2 data-icon="inline-start" />
               )}
-              Delete KB
+              {t("kb.deleteKb")}
             </Button>
           )}
         </div>
@@ -357,12 +365,8 @@ export default function KnowledgeBaseDetailPage() {
 
       <section className="space-y-4">
         <div>
-          <h2 className="font-heading text-xl font-semibold">
-            Documents / 文档
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Upload PDF, Markdown, TXT, or DOCX — then Process to embed
-          </p>
+          <h2 className="font-heading text-xl font-semibold">{t("docs.title")}</h2>
+          <p className="text-sm text-muted-foreground">{t("docs.subtitle")}</p>
         </div>
 
         {canManage && (
@@ -372,7 +376,7 @@ export default function KnowledgeBaseDetailPage() {
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="file">File / 文件</Label>
+                <Label htmlFor="file">{t("docs.file")}</Label>
                 <Input
                   id="file"
                   type="file"
@@ -382,12 +386,12 @@ export default function KnowledgeBaseDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="doc-title">Title / 标题 (optional)</Label>
+                <Label htmlFor="doc-title">{t("docs.titleOptional")}</Label>
                 <Input
                   id="doc-title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Defaults to filename"
+                  placeholder={t("docs.titlePlaceholder")}
                 />
               </div>
             </div>
@@ -397,14 +401,14 @@ export default function KnowledgeBaseDetailPage() {
               ) : (
                 <Upload data-icon="inline-start" />
               )}
-              Upload / 上传
+              {t("docs.upload")}
             </Button>
           </form>
         )}
 
         {documents.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-            No documents yet / 暂无文档
+            {t("docs.empty")}
           </p>
         ) : (
           <ul className="divide-y divide-border/80 border-y border-border/80">
@@ -418,9 +422,11 @@ export default function KnowledgeBaseDetailPage() {
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">
                     {doc.filename}
                     {doc.chunkCount != null && doc.status === "ready"
-                      ? ` · ${doc.chunkCount} chunks`
+                      ? ` · ${t("docs.chunks", { count: doc.chunkCount })}`
                       : ""}
-                    {doc.pageCount != null ? ` · ${doc.pageCount} pages` : ""}
+                    {doc.pageCount != null
+                      ? ` · ${t("docs.pages", { count: doc.pageCount })}`
+                      : ""}
                   </p>
                   {doc.status === "failed" && doc.errorMessage && (
                     <p className="mt-1 text-xs text-destructive">
@@ -430,7 +436,7 @@ export default function KnowledgeBaseDetailPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant={statusVariant[doc.status]}>
-                    {statusLabel[doc.status]}
+                    {statusLabel(t, doc.status)}
                   </Badge>
                   {canManage &&
                     doc.status !== "ready" &&
@@ -446,7 +452,7 @@ export default function KnowledgeBaseDetailPage() {
                         ) : (
                           <Play data-icon="inline-start" />
                         )}
-                        Process
+                        {t("docs.process")}
                       </Button>
                     )}
                   {canManage && (
@@ -454,7 +460,7 @@ export default function KnowledgeBaseDetailPage() {
                       size="icon-sm"
                       variant="ghost"
                       onClick={() => void deleteDoc(doc.id)}
-                      aria-label="Delete document"
+                      aria-label={t("docs.deleteAria")}
                     >
                       <Trash2 />
                     </Button>
@@ -470,10 +476,10 @@ export default function KnowledgeBaseDetailPage() {
 
       <section className="space-y-4">
         <div>
-          <h2 className="font-heading text-xl font-semibold">Members / 成员</h2>
-          <p className="text-sm text-muted-foreground">
-            Add by email · roles: read / manage
-          </p>
+          <h2 className="font-heading text-xl font-semibold">
+            {t("members.title")}
+          </h2>
+          <p className="text-sm text-muted-foreground">{t("members.subtitle")}</p>
         </div>
 
         {canManage && (
@@ -482,18 +488,18 @@ export default function KnowledgeBaseDetailPage() {
             className="flex flex-wrap items-end gap-3 rounded-2xl border border-border/80 bg-card/80 p-5"
           >
             <div className="min-w-[200px] flex-1 space-y-2">
-              <Label htmlFor="member-email">Email / 邮箱</Label>
+              <Label htmlFor="member-email">{t("members.email")}</Label>
               <Input
                 id="member-email"
                 type="email"
                 value={memberEmail}
                 onChange={(e) => setMemberEmail(e.target.value)}
-                placeholder="colleague@company.com"
+                placeholder={t("members.emailPlaceholder")}
                 required
               />
             </div>
             <div className="w-36 space-y-2">
-              <Label>Role / 角色</Label>
+              <Label>{t("members.role")}</Label>
               <Select
                 value={memberRole}
                 onValueChange={(v) => setMemberRole(v as "read" | "manage")}
@@ -502,8 +508,8 @@ export default function KnowledgeBaseDetailPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="read">read</SelectItem>
-                  <SelectItem value="manage">manage</SelectItem>
+                  <SelectItem value="read">{t("roles.read")}</SelectItem>
+                  <SelectItem value="manage">{t("roles.manage")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -513,13 +519,13 @@ export default function KnowledgeBaseDetailPage() {
               ) : (
                 <UserPlus data-icon="inline-start" />
               )}
-              Add
+              {t("members.add")}
             </Button>
           </form>
         )}
 
         {members.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No members listed.</p>
+          <p className="text-sm text-muted-foreground">{t("members.empty")}</p>
         ) : (
           <ul className="divide-y divide-border/80 border-y border-border/80">
             {members.map((m) => (
@@ -534,8 +540,8 @@ export default function KnowledgeBaseDetailPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="capitalize">
-                    {m.role}
+                  <Badge variant="secondary">
+                    {t(m.role === "manage" ? "roles.manage" : "roles.read")}
                   </Badge>
                   {canManage && (
                     <Button
@@ -543,7 +549,7 @@ export default function KnowledgeBaseDetailPage() {
                       variant="ghost"
                       onClick={() => void removeMember(m.userId)}
                     >
-                      Remove
+                      {t("members.remove")}
                     </Button>
                   )}
                 </div>

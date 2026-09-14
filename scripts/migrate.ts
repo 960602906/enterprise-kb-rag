@@ -13,6 +13,7 @@ async function main() {
   console.log("Enabling extensions...");
   await sql`CREATE EXTENSION IF NOT EXISTS vector`;
   await sql`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`;
+  await sql`CREATE EXTENSION IF NOT EXISTS pg_trgm`;
 
   await sql`
     DO $$ BEGIN
@@ -142,6 +143,7 @@ async function main() {
   await sql`CREATE INDEX IF NOT EXISTS chunks_document_idx ON chunks(document_id)`;
   await sql`CREATE INDEX IF NOT EXISTS chunks_kb_idx ON chunks(knowledge_base_id)`;
   await sql`CREATE INDEX IF NOT EXISTS chunks_tsv_idx ON chunks USING GIN (tsv)`;
+  await sql`CREATE INDEX IF NOT EXISTS chunks_content_trgm_idx ON chunks USING GIN (content gin_trgm_ops)`;
   await sql`
     DO $$ BEGIN
       CREATE INDEX chunks_embedding_hnsw_idx ON chunks

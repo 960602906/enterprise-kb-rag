@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { AccessError, requireKbAccess, requireUserId } from "@/lib/auth/acl";
 import { db } from "@/lib/db";
 import { documents, knowledgeBases } from "@/lib/db/schema";
+import { deleteKnowledgeBaseObjects } from "@/lib/rag";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -75,6 +76,7 @@ export async function DELETE(_req: Request, ctx: Ctx) {
     const { id } = await ctx.params;
     await requireKbAccess(userId, id, "manage");
 
+    await deleteKnowledgeBaseObjects(id);
     await db.delete(knowledgeBases).where(eq(knowledgeBases.id, id));
     return NextResponse.json({ ok: true });
   } catch (err) {

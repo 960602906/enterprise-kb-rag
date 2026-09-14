@@ -17,6 +17,7 @@ export { parseFile, isAllowedUpload, ALLOWED_EXTENSIONS } from "./parse";
 export {
   hybridRetrieve,
   extractKeywordTerms,
+  isCjkHeavyQuery,
   buildContextBlock,
   makeSnippet,
   type RetrievedChunk,
@@ -24,5 +25,12 @@ export {
 export { expandSynonymTerms, loadSynonymBags } from "./synonyms";
 export { getRetrievalConfig, type RetrievalConfig } from "./retrieval-config";
 export { assertChunksPermitted } from "./acl-chunks";
-export { processDocument, ensureUploadDir, getUploadRoot, objectKey } from "./ingest";
+export {
+  processDocument,
+  deleteDocument,
+  deleteKnowledgeBaseObjects,
+  ensureUploadDir,
+  getUploadRoot,
+  objectKey,
+} from "./ingest";
 export { enqueueDocumentProcessing, drainIngestQueue } from "@/lib/jobs/ingest-queue";

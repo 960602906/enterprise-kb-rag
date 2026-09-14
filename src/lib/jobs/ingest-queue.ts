@@ -6,6 +6,7 @@ import { processDocument } from "@/lib/rag/ingest";
 export type IngestJobStatus = "queued" | "running" | "succeeded" | "failed";
 
 const DEFAULT_MAX_ATTEMPTS = 3;
+const DEFAULT_LOCK_TTL_MS = 3 * 60 * 1000;
 
 export function inlineIngestEnabled(): boolean {
   if (process.env.INGEST_WORKER_INLINE === "true") return true;
@@ -13,9 +14,15 @@ export function inlineIngestEnabled(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
+function lockTtlMs(): number {
+  const raw = Number(process.env.INGEST_LOCK_TTL_MS ?? DEFAULT_LOCK_TTL_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_LOCK_TTL_MS;
+}
+
 /** Persist a job. Optionally kick an in-process run (dev default). */
 export async function enqueueDocumentProcessing(
   documentId: string,
+  options?: { waitInline?: boolean },
 ): Promise<{ jobId: string; inline: boolean }> {
   const [existing] = await db
     .select()
@@ -54,9 +61,14 @@ export async function enqueueDocumentProcessing(
 
   const inline = inlineIngestEnabled();
   if (inline) {
-    void runJob(jobId).catch((err) => {
-      console.error(`[ingest-queue] inline job ${jobId} failed:`, err);
-    });
+    const run = runJob(jobId);
+    if (options?.waitInline) {
+      await run;
+    } else {
+      void run.catch((err) => {
+        console.error(`[ingest-queue] inline job ${jobId} failed:`, err);
+      });
+    }
   }
   return { jobId, inline };
 }
@@ -64,12 +76,14 @@ export async function enqueueDocumentProcessing(
 export async function drainIngestQueue(options?: {
   limit?: number;
   workerId?: string;
-}): Promise<{ processed: string[]; failed: string[] }> {
+}): Promise<{ processed: string[]; failed: string[]; reclaimed: number }> {
   const limit = options?.limit ?? 10;
   const workerId =
     options?.workerId ?? `worker-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
   const processed: string[] = [];
   const failed: string[] = [];
+
+  const reclaimed = await reclaimStaleJobs();
 
   for (let i = 0; i < limit; i++) {
     const job = await claimNextJob(workerId);
@@ -81,7 +95,41 @@ export async function drainIngestQueue(options?: {
       failed.push(job.documentId);
     }
   }
-  return { processed, failed };
+  return { processed, failed, reclaimed };
+}
+
+/** Re-queue jobs left `running` after a serverless timeout or crashed worker. */
+export async function reclaimStaleJobs(): Promise<number> {
+  const ttlSeconds = Math.max(30, Math.floor(lockTtlMs() / 1000));
+  const rows = await db.execute<{ id: string; document_id: string }>(sql`
+    UPDATE ingest_jobs j
+    SET
+      status = 'queued',
+      locked_at = NULL,
+      locked_by = NULL,
+      available_at = now(),
+      last_error = COALESCE(j.last_error, 'reclaimed stale lock'),
+      updated_at = now()
+    WHERE j.status = 'running'
+      AND j.locked_at IS NOT NULL
+      AND j.locked_at < now() - (${ttlSeconds}::int * interval '1 second')
+    RETURNING j.id, j.document_id
+  `);
+
+  const ids = rows.map((r) => r.document_id).filter(Boolean);
+  if (ids.length > 0) {
+    const idLiteral = `{${ids.join(",")}}`;
+    await db.execute(sql`
+      UPDATE documents
+      SET
+        status = 'pending',
+        updated_at = now()
+      WHERE id = ANY(${idLiteral}::uuid[])
+        AND status = 'processing'
+    `);
+  }
+
+  return rows.length;
 }
 
 type Claimed = {

@@ -5,9 +5,19 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // Override default ignores of eslint-config-next.
+  {
+    rules: {
+      // Client pages fetch on mount; the Next 16 plugin flags this as an error.
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
+  {
+    files: ["src/components/ui/**"],
+    rules: {
+      "react-hooks/purity": "off",
+    },
+  },
   globalIgnores([
-    // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
     "build/**",

@@ -18,8 +18,8 @@ export {
   hybridRetrieve,
   buildContextBlock,
   makeSnippet,
-  assertChunksPermitted,
   type RetrievedChunk,
 } from "./retrieve";
+export { assertChunksPermitted } from "./acl-chunks";
 export { processDocument, ensureUploadDir, getUploadRoot, objectKey } from "./ingest";
 export { enqueueDocumentProcessing, drainIngestQueue } from "@/lib/jobs/ingest-queue";

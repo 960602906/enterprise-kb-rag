@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "comment": "Optional overlay for a fresh-supply ERP corpus. Copy bags into config/retrieval-synonyms.json or set SYNONYM_CONFIG_PATH.",
+  "bags": [
+    {
+      "id": "order-line-edit",
+      "match": "审后|销售明细|改明细|修改明细",
+      "terms": ["修改商品明细", "订单修改", "审核后", "销售订单", "UpdateStatus"]
+    },
+    {
+      "id": "purchase-inbound",
+      "match": "采购入库|入库草稿",
+      "terms": ["采购入库", "草稿", "审核", "入库"]
+    },
+    {
+      "id": "after-sales",
+      "match": "售后",
+      "terms": ["售后列表", "售后单", "查询"]
+    }
+  ]
+}

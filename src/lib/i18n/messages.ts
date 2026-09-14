@@ -25,6 +25,7 @@ export const en = {
   nav: {
     knowledgeBases: "Knowledge Bases",
     chat: "Chat",
+    logs: "Activity",
     signOut: "Sign out",
     overview: "Overview",
     settings: "Settings",
@@ -203,6 +204,15 @@ export const en = {
     selectKb: "Select at least one knowledge base",
     failed: "Chat failed",
   },
+  logs: {
+    title: "Activity",
+    subtitle: "Your recent questions. Only you can see this list.",
+    empty: "No questions yet",
+    emptyBody: "Ask something in Chat. Each answer is stored here with latency and model.",
+    latency: "{ms} ms",
+    model: "{model}",
+    chunks: "{count} chunks",
+  },
   errors: {
     loadFailed: "Failed to load",
     notFound: "Not found",
@@ -249,6 +259,7 @@ export const zh: Dictionary = {
   nav: {
     knowledgeBases: "知识库",
     chat: "问答",
+    logs: "记录",
     signOut: "退出登录",
     overview: "总览",
     settings: "设置",
@@ -424,6 +435,15 @@ export const zh: Dictionary = {
     page: "第 {n} 页",
     selectKb: "请至少选择一个知识库",
     failed: "对话失败",
+  },
+  logs: {
+    title: "问答记录",
+    subtitle: "只看得到你自己的提问记录。",
+    empty: "还没有问过问题",
+    emptyBody: "在问答里提一问。这里会留下问题、耗时和模型。",
+    latency: "{ms} ms",
+    model: "{model}",
+    chunks: "{count} 个分块",
   },
   errors: {
     loadFailed: "加载失败",

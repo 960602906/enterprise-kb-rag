@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "topK": 8,
+  "vectorWeight": 0.65,
+  "keywordWeight": 0.35,
+  "minHybridScore": 0.08,
+  "candidateMultiplier": 3,
+  "candidateMin": 24
+}

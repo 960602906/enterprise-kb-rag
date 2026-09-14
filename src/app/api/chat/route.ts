@@ -7,6 +7,7 @@ import {
   type UIMessage,
 } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import {
@@ -21,7 +22,11 @@ import {
   qaLogs,
   type CitationPayload,
 } from "@/lib/db/schema";
-import { buildContextBlock, hybridRetrieve } from "@/lib/rag";
+import {
+  assertChunksPermitted,
+  buildContextBlock,
+  hybridRetrieve,
+} from "@/lib/rag";
 
 export const maxDuration = 60;
 
@@ -59,7 +64,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // ACL filter BEFORE retrieval — never retrieve-then-filter
     const permitted = await filterPermittedKbIds(userId, knowledgeBaseIds);
     if (permitted.length === 0) {
       return NextResponse.json(
@@ -74,11 +78,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Empty question" }, { status: 400 });
     }
 
-    const retrieved = await hybridRetrieve({
+    const retrievedRaw = await hybridRetrieve({
       query: question,
       permittedKbIds: permitted,
-      topK: 8,
     });
+    const retrieved = await assertChunksPermitted(retrievedRaw, permitted);
 
     const citations: CitationPayload[] = retrieved.map((r) => ({
       chunkId: r.chunkId,
@@ -91,7 +95,9 @@ export async function POST(req: Request) {
     }));
 
     let activeSessionId = sessionId;
-    if (!activeSessionId) {
+    if (activeSessionId) {
+      await requireOwnedChatSession(userId, activeSessionId);
+    } else {
       const [created] = await db
         .insert(chatSessions)
         .values({
@@ -182,6 +188,18 @@ export async function POST(req: Request) {
     console.error("[chat]", err);
     return NextResponse.json({ error: "Chat failed" }, { status: 500 });
   }
+}
+
+async function requireOwnedChatSession(userId: string, sessionId: string) {
+  const [row] = await db
+    .select({ id: chatSessions.id, userId: chatSessions.userId })
+    .from(chatSessions)
+    .where(eq(chatSessions.id, sessionId))
+    .limit(1);
+  if (!row || row.userId !== userId) {
+    throw new AccessError("Chat session not found", 404);
+  }
+  return row;
 }
 
 function extractText(message?: UIMessage): string {

@@ -115,9 +115,11 @@ async function main() {
       uploaded_by_id uuid REFERENCES users(id) ON DELETE SET NULL,
       created_at timestamp NOT NULL DEFAULT now(),
       updated_at timestamp NOT NULL DEFAULT now(),
-      processed_at timestamp
+      processed_at timestamp,
+      metadata jsonb DEFAULT '{}'::jsonb
     );
   `;
+  await sql`ALTER TABLE documents ADD COLUMN IF NOT EXISTS metadata jsonb DEFAULT '{}'::jsonb`;
   await sql`CREATE INDEX IF NOT EXISTS documents_kb_idx ON documents(knowledge_base_id)`;
   await sql`CREATE INDEX IF NOT EXISTS documents_status_idx ON documents(status)`;
 

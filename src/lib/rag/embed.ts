@@ -1,3 +1,4 @@
+import "@/lib/env-sanitize";
 import { createHash } from "crypto";
 import { embed, embedMany } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
@@ -7,8 +8,8 @@ export const EMBEDDING_DIMENSIONS = 1536;
 function getOpenAI() {
   const apiKey = process.env.OPENAI_API_KEY ?? process.env.AI_GATEWAY_API_KEY;
   const baseURL =
-    process.env.OPENAI_BASE_URL ??
-    process.env.AI_GATEWAY_BASE_URL ??
+    process.env.OPENAI_BASE_URL ||
+    process.env.AI_GATEWAY_BASE_URL ||
     undefined;
   return createOpenAI({
     apiKey: apiKey ?? "missing-key",

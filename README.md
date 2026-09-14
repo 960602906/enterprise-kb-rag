@@ -74,6 +74,8 @@ Open [http://localhost:43123](http://localhost:43123).
 | `UPLOAD_DIR` / `MAX_UPLOAD_BYTES` | Upload storage |
 | `SEED_*` | Seed admin/member credentials |
 | `DISABLE_REGISTER` | Block `/api/register` when `true` |
+| `SEARCH_KNOWLEDGE_API_KEY` | SkyRoc SearchKnowledge (`x-api-key`). Local seed: `dev-skyroc-search-knowledge` |
+| `SEARCH_KNOWLEDGE_KB_IDS` | Optional comma-separated KB UUID allowlist for that key |
 
 ## OpenAI or Vercel AI Gateway keys
 
@@ -109,11 +111,11 @@ Without keys, set `MOCK_CHAT=true` and `MOCK_EMBEDDINGS=true` for deterministic 
 src/app/(auth)/login          Login / register
 src/app/(app)/knowledge-bases KB list, create, detail
 src/app/(app)/chat            Multi-KB RAG chat + citations
-src/app/api/                  REST + streaming chat
+src/app/api/                  REST + streaming chat + SearchKnowledge
 src/lib/auth                  Auth.js + ACL helpers
 src/lib/db                    Drizzle schema + client
 src/lib/i18n                  UI chrome strings (zh / en)
-src/lib/rag                   Parse, chunk, embed, retrieve
+src/lib/rag                   Parse, chunk, embed, retrieve, SearchKnowledge
 samples/                      Sample docs for testing
 ```
 
@@ -130,6 +132,45 @@ To add a string:
 ## ACL before retrieve
 
 Chat and ingest **filter permitted knowledge-base IDs before retrieval**. Never retrieve-then-filter — that can leak snippets across tenants. Membership roles (`read` / `manage`) gate upload, process, member admin, and delete.
+
+## SkyRoc SearchKnowledge
+
+Read-only RAG bypass for SkyRoc. The caller retrieves ranked excerpts and **must treat them as context only** — do not invent flows, field values, ticket IDs, or database writes that are not in the snippets.
+
+### Call
+
+```bash
+curl -sS -X POST http://localhost:43123/api/search-knowledge \
+  -H "content-type: application/json" \
+  -H "x-api-key: $SEARCH_KNOWLEDGE_API_KEY" \
+  -d '{"query":"请假流程怎么走","topK":8,"docTypes":["flow"]}'
+```
+
+`GET /api/search-knowledge?query=...&topK=8&docTypes=flow,faq&knowledgeBaseIds=<uuid>` is also supported.
+
+| Field | Notes |
+|-------|--------|
+| `query` | Required |
+| `topK` | Optional, 1–50 (default 8) |
+| `docTypes` | Optional `flow` \| `rule` \| `faq`. Untagged chunks stay eligible |
+| `knowledgeBaseIds` | Optional. If omitted: dedicated **SkyRoc Docs** KB (seeded), else all KBs (or `SEARCH_KNOWLEDGE_KB_IDS`) |
+
+Response: `{ "items": [{ "title", "snippet", "sourcePath", "score", "docType"? }] }`.
+
+Auth: header `x-api-key` must match `SEARCH_KNOWLEDGE_API_KEY`. If the env is unset, production returns 503; development allows **localhost only** and logs a warning. Prefer setting the seed key in `.env.local`.
+
+This route does **not** stream chat or call the LLM. Existing `/api/chat` RAG is unchanged.
+
+### Chunking defaults
+
+See [`src/lib/rag/chunk-config.ts`](./src/lib/rag/chunk-config.ts):
+
+- Target window **400–800 tokens**, overlap **~100** (80–120)
+- Prefer markdown headings; for `docType=flow`, also split on `步骤` / `Step N` / numbered steps
+- Chunk metadata: `docType`, `sourcePath`, `title` (inferred from path/filename or upload form fields `docType` / `sourcePath`)
+- Corpus allowlist: `docs/frontend-admin/business-flows/*`, `单据变更流水推广任务.md`, `testing/联调` — never source code or production DB dumps
+
+Upload SkyRoc markdown into the **SkyRoc Docs** knowledge base (or pass `knowledgeBaseIds`) and click Process so chunks are `ready`.
 
 ## Sample document
 

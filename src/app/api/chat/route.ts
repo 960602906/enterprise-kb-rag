@@ -1,3 +1,4 @@
+import "@/lib/env-sanitize";
 import {
   convertToModelMessages,
   createUIMessageStream,
@@ -27,7 +28,7 @@ export const maxDuration = 60;
 function getModel() {
   const apiKey = process.env.OPENAI_API_KEY ?? process.env.AI_GATEWAY_API_KEY;
   const baseURL =
-    process.env.OPENAI_BASE_URL ?? process.env.AI_GATEWAY_BASE_URL ?? undefined;
+    process.env.OPENAI_BASE_URL || process.env.AI_GATEWAY_BASE_URL || undefined;
   const openai = createOpenAI({
     apiKey: apiKey ?? "missing-key",
     baseURL,

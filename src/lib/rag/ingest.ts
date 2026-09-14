@@ -4,6 +4,7 @@ import path from "path";
 import { db } from "@/lib/db";
 import { chunks, documents } from "@/lib/db/schema";
 import { chunkText } from "./chunk";
+import { buildChunkMetadata, SKYROC_CHUNK } from "./chunk-config";
 import { embedTexts } from "./embed";
 import { parseFile } from "./parse";
 
@@ -45,7 +46,13 @@ export async function processDocument(documentId: string): Promise<void> {
   try {
     const buffer = await readFile(doc.storagePath);
     const parsed = await parseFile(buffer, doc.mimeType, doc.filename);
-    const textChunks = chunkText(parsed.text);
+    const chunkMeta = buildChunkMetadata(doc);
+    const textChunks = chunkText(parsed.text, {
+      minTokens: SKYROC_CHUNK.minTokens,
+      maxTokens: SKYROC_CHUNK.maxTokens,
+      overlapTokens: SKYROC_CHUNK.overlapTokens,
+      preferStepBoundaries: chunkMeta.docType === "flow",
+    });
 
     if (textChunks.length === 0) {
       throw new Error("No extractable text found in document");
@@ -79,7 +86,7 @@ export async function processDocument(documentId: string): Promise<void> {
             ${c.headingPath ?? null},
             ${embeddingLiteral}::vector,
             to_tsvector('english', ${c.content}),
-            '{}'::jsonb,
+            ${JSON.stringify(chunkMeta)}::jsonb,
             now()
           )
         `);

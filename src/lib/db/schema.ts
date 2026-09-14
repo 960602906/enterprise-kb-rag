@@ -158,6 +158,7 @@ export const documents = pgTable(
     uploadedById: uuid("uploaded_by_id").references(() => users.id, {
       onDelete: "set null",
     }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
     processedAt: timestamp("processed_at", { mode: "date" }),

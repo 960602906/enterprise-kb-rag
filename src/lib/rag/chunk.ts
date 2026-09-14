@@ -1,3 +1,5 @@
+import { SKYROC_CHUNK } from "./chunk-config";
+
 export function estimateTokens(text: string): number {
   const cjk = (text.match(/[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/g) ?? [])
     .join("").length;
@@ -18,20 +20,24 @@ type Segment = {
   pageNumber?: number;
 };
 
-/** Heading-aware chunking into ~300–800 token windows with overlap. */
+/** Heading-aware chunking into ~400–800 token windows with overlap. */
 export function chunkText(
   raw: string,
   options?: {
     minTokens?: number;
     maxTokens?: number;
     overlapTokens?: number;
+    /** Split on 步骤 / Step N / numbered steps (business-flows). */
+    preferStepBoundaries?: boolean;
   },
 ): TextChunk[] {
-  const minTokens = options?.minTokens ?? 300;
-  const maxTokens = options?.maxTokens ?? 800;
-  const overlapTokens = options?.overlapTokens ?? 80;
+  const minTokens = options?.minTokens ?? SKYROC_CHUNK.minTokens;
+  const maxTokens = options?.maxTokens ?? SKYROC_CHUNK.maxTokens;
+  const overlapTokens = options?.overlapTokens ?? SKYROC_CHUNK.overlapTokens;
 
-  const segments = splitIntoSegments(raw);
+  const segments = splitIntoSegments(raw, {
+    preferStepBoundaries: options?.preferStepBoundaries ?? false,
+  });
   const chunks: TextChunk[] = [];
 
   let buffer = "";
@@ -90,7 +96,10 @@ export function chunkText(
   return chunks.filter((c) => c.content.length > 0);
 }
 
-function splitIntoSegments(raw: string): Segment[] {
+function splitIntoSegments(
+  raw: string,
+  options?: { preferStepBoundaries?: boolean },
+): Segment[] {
   const withPages = raw.replace(/\f/g, "\n\n--- Page Break ---\n\n");
   const parts = withPages.split(/\n(?=#{1,6}\s)/);
   const segments: Segment[] = [];
@@ -123,17 +132,35 @@ function splitIntoSegments(raw: string): Segment[] {
     }
 
     if (!content) continue;
-    segments.push({
-      content,
-      headingPath: headingStack.filter(Boolean).join(" > "),
-      pageNumber: sawPage ? pageNumber : undefined,
-    });
+
+    const pieces = options?.preferStepBoundaries
+      ? splitStepPieces(content)
+      : [content];
+    const headingPath = headingStack.filter(Boolean).join(" > ");
+    for (const piece of pieces) {
+      if (!piece.trim()) continue;
+      segments.push({
+        content: piece.trim(),
+        headingPath,
+        pageNumber: sawPage ? pageNumber : undefined,
+      });
+    }
   }
 
   if (segments.length === 0 && raw.trim()) {
     segments.push({ content: raw.trim(), headingPath: "" });
   }
   return segments;
+}
+
+/** Split business-flow markdown on 步骤 / Step N / numbered steps. */
+function splitStepPieces(content: string): string[] {
+  return content
+    .split(
+      /\n(?=(?:#{1,6}\s+)?(?:步骤|Step)\s*[:：.]?\s*\d+|(?:\d{1,3}[\.、]|[（(]\d+[）)])\s+\S)/,
+    )
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function hardSplit(

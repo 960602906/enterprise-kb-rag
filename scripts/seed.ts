@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { SKYROC_KNOWLEDGE_BASE_NAME } from "../src/lib/rag/chunk-config";
 import {
   kbMembers,
   knowledgeBases,
@@ -76,6 +77,29 @@ async function main() {
       { knowledgeBaseId: kb.id, userId: member.id, role: "read" },
     ]);
     console.log(`Created knowledge base: ${kb.name}`);
+  }
+
+  let [skyrocKb] = await db
+    .select()
+    .from(knowledgeBases)
+    .where(eq(knowledgeBases.name, SKYROC_KNOWLEDGE_BASE_NAME));
+
+  if (!skyrocKb) {
+    [skyrocKb] = await db
+      .insert(knowledgeBases)
+      .values({
+        name: SKYROC_KNOWLEDGE_BASE_NAME,
+        description:
+          "Read-only corpus for SkyRoc SearchKnowledge (business-flows, rules, FAQs).",
+        ownerId: admin.id,
+      })
+      .returning();
+
+    await db.insert(kbMembers).values([
+      { knowledgeBaseId: skyrocKb.id, userId: admin.id, role: "manage" },
+      { knowledgeBaseId: skyrocKb.id, userId: member.id, role: "read" },
+    ]);
+    console.log(`Created knowledge base: ${skyrocKb.name}`);
   }
 
   console.log("\nSeed complete. Sign in with:");

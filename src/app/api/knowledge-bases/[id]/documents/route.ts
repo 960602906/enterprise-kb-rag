@@ -9,7 +9,10 @@ import { documents } from "@/lib/db/schema";
 import {
   enqueueDocumentProcessing,
   ensureUploadDir,
+  inferDocType,
+  inferSourcePath,
   isAllowedUpload,
+  isDocType,
 } from "@/lib/rag";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -42,6 +45,14 @@ export async function POST(req: Request, ctx: Ctx) {
       );
     }
 
+    const explicitDocType = (form.get("docType") as string | null)?.trim();
+    if (explicitDocType && !isDocType(explicitDocType)) {
+      return NextResponse.json(
+        { error: "docType must be flow, rule, or faq" },
+        { status: 400 },
+      );
+    }
+
     const dir = await ensureUploadDir(knowledgeBaseId);
     const safeName = file.name.replace(/[^\w.\-()\s\u4e00-\u9fff]/g, "_");
     const storedName = `${randomUUID()}-${safeName}`;
@@ -52,6 +63,16 @@ export async function POST(req: Request, ctx: Ctx) {
     const title =
       (form.get("title") as string | null)?.trim() ||
       safeName.replace(/\.[^.]+$/, "");
+
+    const explicitSource = (form.get("sourcePath") as string | null)?.trim();
+    const sourcePath =
+      explicitSource || inferSourcePath(safeName, storagePath);
+    const docType = inferDocType({
+      filename: safeName,
+      sourcePath,
+      title,
+      explicit: explicitDocType,
+    });
 
     const [doc] = await db
       .insert(documents)
@@ -64,6 +85,10 @@ export async function POST(req: Request, ctx: Ctx) {
         storagePath,
         status: "pending",
         uploadedById: userId,
+        metadata: {
+          ...(docType ? { docType } : {}),
+          sourcePath,
+        },
       })
       .returning();
 

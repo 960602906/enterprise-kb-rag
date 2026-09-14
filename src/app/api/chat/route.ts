@@ -27,6 +27,7 @@ import {
   buildContextBlock,
   hybridRetrieve,
 } from "@/lib/rag";
+import { envInt, hitRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 
 export const maxDuration = 60;
 
@@ -47,6 +48,11 @@ export async function POST(req: Request) {
   try {
     const session = await auth();
     const userId = await requireUserId(session);
+    const limited = hitRateLimit({
+      key: `chat:${userId}`,
+      limit: envInt("CHAT_RATE_LIMIT_PER_MIN", 20),
+    });
+    if (!limited.ok) return rateLimitedResponse(limited);
     const body = await req.json();
 
     const messages = (body.messages ?? []) as UIMessage[];
@@ -217,19 +223,10 @@ function extractText(message?: UIMessage): string {
 
 function buildSystemPrompt(context: string, empty: boolean): string {
   if (empty) {
-    return `You are an internal enterprise knowledge assistant.
-No relevant documents were retrieved for this question.
-Clearly tell the user you could not find supporting material in the selected knowledge bases,
-and suggest refining the question or uploading documents. Do not invent company policies.`;
+    return `You are an internal enterprise knowledge assistant.\nNo relevant documents were retrieved for this question.\nClearly tell the user you could not find supporting material in the selected knowledge bases,\nand suggest refining the question or uploading documents. Do not invent company policies.`;
   }
 
-  return `You are an internal enterprise knowledge assistant (企业知识库助手).
-Answer ONLY using the retrieved context below. Cite sources inline like [1], [2] matching the context numbering.
-If the context is insufficient, say so clearly in Chinese or English matching the user's language.
-Do not invent policies, numbers, or procedures that are not in the context.
-
-Retrieved context:
-${context}`;
+  return `You are an internal enterprise knowledge assistant (企业知识库助手).\nAnswer ONLY using the retrieved context below. Cite sources inline like [1], [2] matching the context numbering.\nIf the context is insufficient, say so clearly in Chinese or English matching the user's language.\nDo not invent policies, numbers, or procedures that are not in the context.\n\nRetrieved context:\n${context}`;
 }
 
 function mockAnswer(question: string, citations: CitationPayload[]): string {

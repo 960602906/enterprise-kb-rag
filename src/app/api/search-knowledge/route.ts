@@ -5,6 +5,12 @@ import {
   authorizeSearchKnowledge,
   searchKnowledge,
 } from "@/lib/rag/search-knowledge";
+import {
+  clientIp,
+  envInt,
+  hitRateLimit,
+  rateLimitedResponse,
+} from "@/lib/rate-limit";
 
 const docTypeSchema = z.enum(DOC_TYPES);
 
@@ -15,6 +21,13 @@ const bodySchema = z.object({
   knowledgeBaseIds: z.array(z.string().uuid()).optional(),
 });
 
+function searchLimit(req: Request) {
+  return hitRateLimit({
+    key: `search-knowledge:${clientIp(req)}`,
+    limit: envInt("SEARCH_RATE_LIMIT_PER_MIN", 60),
+  });
+}
+
 /**
  * SkyRoc read-only RAG bypass.
  * Auth: `x-api-key` matching SEARCH_KNOWLEDGE_API_KEY.
@@ -24,6 +37,8 @@ export async function POST(req: Request) {
   if (!authz.ok) {
     return NextResponse.json({ error: authz.error }, { status: authz.status });
   }
+  const limited = searchLimit(req);
+  if (!limited.ok) return rateLimitedResponse(limited);
 
   try {
     const json = await req.json().catch(() => null);
@@ -47,6 +62,8 @@ export async function GET(req: Request) {
   if (!authz.ok) {
     return NextResponse.json({ error: authz.error }, { status: authz.status });
   }
+  const limited = searchLimit(req);
+  if (!limited.ok) return rateLimitedResponse(limited);
 
   try {
     const url = new URL(req.url);

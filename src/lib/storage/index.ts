@@ -129,7 +129,11 @@ export class S3ObjectStore implements ObjectStore {
   ): Promise<Response> {
     const url = this.objectUrl(key);
     const headers = this.sign(method, url, body, contentType);
-    return fetch(url, { method, headers, body });
+    const init: RequestInit = { method, headers };
+    if (body) {
+      init.body = new Uint8Array(body);
+    }
+    return fetch(url, init);
   }
 
   private objectUrl(key: string): string {

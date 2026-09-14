@@ -17,7 +17,7 @@ function getOpenAI() {
   });
 }
 
-function useMockEmbeddings(): boolean {
+function mockEmbeddingsEnabled(): boolean {
   if (process.env.MOCK_EMBEDDINGS === "true") return true;
   if (process.env.MOCK_EMBEDDINGS === "false") return false;
   return !(process.env.OPENAI_API_KEY || process.env.AI_GATEWAY_API_KEY);
@@ -30,7 +30,6 @@ export function tokenizeForMockEmbed(text: string): string[] {
   for (const m of lower.matchAll(/[a-z0-9_]+/g)) {
     tokens.push(m[0]);
   }
-  // CJK Unified Ideographs (+ common extension A) runs → uni + bi grams
   for (const m of lower.matchAll(/[\u3400-\u9fff]+/g)) {
     const run = m[0];
     for (let i = 0; i < run.length; i++) {
@@ -57,7 +56,7 @@ export function mockEmbed(text: string): number[] {
 }
 
 export async function embedText(text: string): Promise<number[]> {
-  if (useMockEmbeddings()) return mockEmbed(text);
+  if (mockEmbeddingsEnabled()) return mockEmbed(text);
   const openai = getOpenAI();
   const model = process.env.EMBEDDING_MODEL ?? "text-embedding-3-small";
   const { embedding } = await embed({
@@ -69,7 +68,7 @@ export async function embedText(text: string): Promise<number[]> {
 
 export async function embedTexts(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
-  if (useMockEmbeddings()) return texts.map(mockEmbed);
+  if (mockEmbeddingsEnabled()) return texts.map(mockEmbed);
 
   const openai = getOpenAI();
   const model = process.env.EMBEDDING_MODEL ?? "text-embedding-3-small";

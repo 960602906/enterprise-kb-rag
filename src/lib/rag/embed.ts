@@ -23,15 +23,33 @@ function useMockEmbeddings(): boolean {
   return !(process.env.OPENAI_API_KEY || process.env.AI_GATEWAY_API_KEY);
 }
 
+/** Split text into ASCII words + CJK unigrams/bigrams for mock embeddings. */
+export function tokenizeForMockEmbed(text: string): string[] {
+  const tokens: string[] = [];
+  const lower = text.toLowerCase();
+  for (const m of lower.matchAll(/[a-z0-9_]+/g)) {
+    tokens.push(m[0]);
+  }
+  // CJK Unified Ideographs (+ common extension A) runs → uni + bi grams
+  for (const m of lower.matchAll(/[\u3400-\u9fff]+/g)) {
+    const run = m[0];
+    for (let i = 0; i < run.length; i++) {
+      tokens.push(run[i]!);
+      if (i + 1 < run.length) tokens.push(run.slice(i, i + 2));
+    }
+  }
+  return tokens;
+}
+
 /** Deterministic pseudo-embedding for local/dev without API keys. */
 export function mockEmbed(text: string): number[] {
   const vec = new Array(EMBEDDING_DIMENSIONS).fill(0);
-  const tokens = text.toLowerCase().split(/\W+/).filter(Boolean);
+  const tokens = tokenizeForMockEmbed(text);
   for (const token of tokens) {
     const h = createHash("sha256").update(token).digest();
     for (let i = 0; i < 16; i++) {
-      const dim = (h[i] + h[i + 16] * 256) % EMBEDDING_DIMENSIONS;
-      vec[dim] += ((h[i] % 13) - 6) / 6;
+      const dim = (h[i]! + h[i + 16]! * 256) % EMBEDDING_DIMENSIONS;
+      vec[dim]! += ((h[i]! % 13) - 6) / 6;
     }
   }
   const norm = Math.sqrt(vec.reduce((s, v) => s + v * v, 0)) || 1;

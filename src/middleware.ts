@@ -15,5 +15,10 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/knowledge-bases/:path*", "/chat/:path*"],
+  matcher: [
+    "/knowledge-bases/:path*",
+    "/chat/:path*",
+    "/overview/:path*",
+    "/settings/:path*",
+  ],
 };

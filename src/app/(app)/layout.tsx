@@ -1,11 +1,7 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth, signOut } from "@/lib/auth";
-import { AppHeader } from "@/components/layout/app-header";
-
-async function signOutAction() {
-  "use server";
-  await signOut({ redirectTo: "/login" });
-}
+import { auth } from "@/lib/auth";
+import { AppShell } from "@/components/layout/app-shell";
 
 export default async function AppLayout({
   children,
@@ -17,15 +13,19 @@ export default async function AppLayout({
     redirect("/login");
   }
 
+  const cookieStore = await cookies();
+  const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
+
   return (
-    <div className="flex min-h-screen flex-col">
-      <AppHeader
-        email={session.user.email ?? ""}
-        signOutAction={signOutAction}
-      />
-      <div className="mx-auto flex w-full max-w-6xl min-h-0 flex-1 flex-col px-4 py-8 sm:px-6 sm:py-10">
-        {children}
-      </div>
-    </div>
+    <AppShell
+      user={{
+        name: session.user.name,
+        email: session.user.email,
+        image: session.user.image,
+      }}
+      defaultOpen={defaultOpen}
+    >
+      {children}
+    </AppShell>
   );
 }

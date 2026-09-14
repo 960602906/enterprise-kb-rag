@@ -6,9 +6,17 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PageHeader } from "@/components/layout/page-header";
 import { translateApiError, useI18n } from "@/lib/i18n";
 
 export default function NewKnowledgeBasePage() {
@@ -45,54 +53,55 @@ export default function NewKnowledgeBasePage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-lg animate-fade-up space-y-8">
-      <Link
-        href="/knowledge-bases"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" />
-        {t("kb.back")}
-      </Link>
-      <div className="space-y-1.5">
-        <h1 className="font-heading text-3xl font-semibold tracking-tight">
-          {t("kb.newTitle")}
-        </h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          {t("kb.newSubtitle")}
-        </p>
-      </div>
-      <form onSubmit={onSubmit} className="surface space-y-5 rounded-2xl p-6 sm:p-7">
-        <div className="space-y-2">
-          <Label htmlFor="name">{t("kb.name")}</Label>
-          <Input
-            id="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            maxLength={200}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="desc">{t("kb.description")}</Label>
-          <Textarea
-            id="desc"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={4}
-            maxLength={2000}
-          />
-        </div>
-        <Button type="submit" disabled={creating || !name.trim()}>
-          {creating ? (
-            <>
-              <Loader2 className="animate-spin" />
-              {t("kb.creating")}
-            </>
-          ) : (
-            t("kb.create")
-          )}
+    <div className="mx-auto w-full max-w-lg space-y-4">
+      <PageHeader title={t("kb.newTitle")} description={t("kb.newSubtitle")}>
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/knowledge-bases">
+            <ArrowLeft data-icon="inline-start" />
+            {t("kb.back")}
+          </Link>
         </Button>
-      </form>
+      </PageHeader>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("kb.createTitle")}</CardTitle>
+          <CardDescription>{t("kb.createDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">{t("kb.name")}</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                maxLength={200}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="desc">{t("kb.description")}</Label>
+              <Textarea
+                id="desc"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                maxLength={2000}
+              />
+            </div>
+            <Button type="submit" disabled={creating || !name.trim()}>
+              {creating ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  {t("kb.creating")}
+                </>
+              ) : (
+                t("kb.create")
+              )}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

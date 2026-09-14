@@ -23,6 +23,71 @@ export type RetrievedChunk = CitationPayload & {
  * CRITICAL: `permittedKbIds` must already be ACL-filtered.
  * Never retrieve-then-post-filter — WHERE constrains KB ids.
  */
+
+const CJK_STOP = new Set([
+  "怎么",
+  "怎样",
+  "如何",
+  "什么",
+  "吗",
+  "呢",
+  "啊",
+  "的",
+  "了",
+  "是",
+  "否",
+  "能否",
+  "可以",
+  "是否",
+  "一下",
+  "这个",
+  "那个",
+  "一个",
+]);
+
+/**
+ * Keyword terms for hybrid retrieval.
+ * ASCII: word tokens. CJK: overlapping bigrams (stopwords dropped) so
+ * queries like「售后怎么查」still hit chunks containing「售后」.
+ */
+export function extractKeywordTerms(query: string): string[] {
+  const terms: string[] = [];
+  const seen = new Set<string>();
+  const add = (t: string) => {
+    if (!t || CJK_STOP.has(t) || seen.has(t)) return;
+    seen.add(t);
+    terms.push(t);
+  };
+
+  for (const m of query.toLowerCase().matchAll(/[a-z0-9_]{2,}/g)) {
+    add(m[0]!);
+  }
+  for (const m of query.matchAll(/[\u3400-\u9fff]+/g)) {
+    const run = m[0]!;
+    if (run.length === 1) {
+      add(run);
+      continue;
+    }
+    for (let i = 0; i + 1 < run.length; i++) {
+      add(run.slice(i, i + 2));
+    }
+    // Also keep full run when short (2–6 chars) for exact phrase boost
+    if (run.length >= 2 && run.length <= 6) add(run);
+  }
+  // Domain synonym expansion for short Chinese ops questions (SkyRoc corpus).
+  const blob = query.replace(/\s+/g, "");
+  const synonymBags: [RegExp, string[]][] = [
+    [/审后|销售明细|改明细|修改明细/, ["修改商品明细", "订单修改", "审核后", "销售订单", "UpdateStatus"]],
+    [/采购入库|入库草稿/, ["采购入库", "草稿", "审核", "入库"]],
+    [/售后/, ["售后列表", "售后单", "查询"]],
+  ];
+  for (const [re, extras] of synonymBags) {
+    if (re.test(blob)) for (const e of extras) add(e);
+  }
+
+  return terms;
+}
+
 export async function hybridRetrieve(options: {
   query: string;
   permittedKbIds: string[];
@@ -71,6 +136,9 @@ export async function hybridRetrieve(options: {
     LIMIT ${candidateLimit}
   `);
 
+  const keywordTerms = extractKeywordTerms(query);
+  const termsLiteral = `{${keywordTerms.map((t) => JSON.stringify(t)).join(",")}}`;
+
   const keywordRows = await db.execute<RetrievalRow>(sql`
     SELECT
       c.id,
@@ -82,12 +150,32 @@ export async function hybridRetrieve(options: {
       d.filename AS document_filename,
       d.storage_path AS document_storage_path,
       c.metadata AS metadata,
-      ts_rank_cd(c.tsv, plainto_tsquery('english', ${query}))::float AS keyword_score
+      (
+        COALESCE(ts_rank_cd(c.tsv, plainto_tsquery('english', ${query})), 0)
+        + COALESCE((
+            SELECT COUNT(*)::float
+            FROM unnest(${termsLiteral}::text[]) AS t(term)
+            WHERE length(t.term) > 0 AND c.content ILIKE ('%' || t.term || '%')
+          ), 0)
+        + CASE
+            WHEN d.title ILIKE ('%' || ${query} || '%') THEN 2
+            ELSE 0
+          END
+      )::float AS keyword_score
     FROM chunks c
     INNER JOIN documents d ON d.id = c.document_id
     WHERE c.knowledge_base_id = ANY(${kbArrayLiteral}::uuid[])
-      AND c.tsv @@ plainto_tsquery('english', ${query})
       AND d.status = 'ready'
+      AND (
+        c.tsv @@ plainto_tsquery('english', ${query})
+        OR (
+          cardinality(${termsLiteral}::text[]) > 0
+          AND EXISTS (
+            SELECT 1 FROM unnest(${termsLiteral}::text[]) AS t(term)
+            WHERE length(t.term) > 0 AND c.content ILIKE ('%' || t.term || '%')
+          )
+        )
+      )
       ${docTypeClause}
     ORDER BY keyword_score DESC
     LIMIT ${candidateLimit}

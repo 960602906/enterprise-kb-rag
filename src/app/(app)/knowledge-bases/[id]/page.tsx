@@ -29,6 +29,14 @@ import {
   ErrorState,
   LoadingState,
 } from "@/components/layout/states";
+import { PageHeader } from "@/components/layout/page-header";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { translateApiError, useI18n, type TranslateFn } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -316,31 +324,20 @@ export default function KnowledgeBaseDetailPage() {
   }
 
   return (
-    <div className="animate-fade-up space-y-10">
-      <div>
-        <Link
-          href="/knowledge-bases"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          {t("nav.knowledgeBases")}
-        </Link>
-        <div className="mt-5 flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 space-y-2">
-            <h1 className="font-heading text-3xl font-semibold tracking-tight">
-              {kb.name}
-            </h1>
-            {kb.description && (
-              <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                {kb.description}
-              </p>
-            )}
-            <Badge variant="secondary">
-              {t("kb.yourRole", {
-                role: t(kb.role === "manage" ? "roles.manage" : "roles.read"),
-              })}
-            </Badge>
-          </div>
+    <div className="space-y-6">
+      <PageHeader title={kb.name} description={kb.description ?? undefined}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary">
+            {t("kb.yourRole", {
+              role: t(kb.role === "manage" ? "roles.manage" : "roles.read"),
+            })}
+          </Badge>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/knowledge-bases">
+              <ArrowLeft data-icon="inline-start" />
+              {t("kb.back")}
+            </Link>
+          </Button>
           {canManage && (
             <Button
               variant="destructive"
@@ -357,22 +354,18 @@ export default function KnowledgeBaseDetailPage() {
             </Button>
           )}
         </div>
-      </div>
+      </PageHeader>
 
-      <section className="space-y-5">
-        <div className="space-y-1">
-          <h2 className="font-heading text-xl font-semibold tracking-tight">
-            {t("docs.title")}
-          </h2>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            {t("docs.subtitle")}
-          </p>
-        </div>
-
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("docs.title")}</CardTitle>
+          <CardDescription>{t("docs.subtitle")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
         {canManage && (
           <form
             onSubmit={onUpload}
-            className="surface-dashed space-y-4 rounded-2xl p-5"
+            className="space-y-4 rounded-lg border border-dashed p-4"
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -414,13 +407,13 @@ export default function KnowledgeBaseDetailPage() {
             className="py-12"
           />
         ) : (
-          <ul className="surface overflow-hidden rounded-2xl">
+          <ul className="overflow-hidden rounded-lg border">
             {documents.map((doc, i) => (
               <li
                 key={doc.id}
                 className={cn(
-                  "flex flex-wrap items-center justify-between gap-3 px-5 py-4",
-                  i > 0 && "border-t border-border/50",
+                  "flex flex-wrap items-center justify-between gap-3 px-4 py-3.5",
+                  i > 0 && "border-t",
                 )}
               >
                 <div className="min-w-0">
@@ -476,22 +469,19 @@ export default function KnowledgeBaseDetailPage() {
             ))}
           </ul>
         )}
-      </section>
+        </CardContent>
+      </Card>
 
-      <section className="space-y-5">
-        <div className="space-y-1">
-          <h2 className="font-heading text-xl font-semibold tracking-tight">
-            {t("members.title")}
-          </h2>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            {t("members.subtitle")}
-          </p>
-        </div>
-
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("members.title")}</CardTitle>
+          <CardDescription>{t("members.subtitle")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
         {canManage && (
           <form
             onSubmit={addMember}
-            className="surface flex flex-wrap items-end gap-3 rounded-2xl p-5"
+            className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
           >
             <div className="min-w-[200px] flex-1 space-y-2">
               <Label htmlFor="member-email">{t("members.email")}</Label>
@@ -533,13 +523,13 @@ export default function KnowledgeBaseDetailPage() {
         {members.length === 0 ? (
           <p className="px-1 text-sm text-muted-foreground">{t("members.empty")}</p>
         ) : (
-          <ul className="surface overflow-hidden rounded-2xl">
+          <ul className="overflow-hidden rounded-lg border">
             {members.map((m, i) => (
               <li
                 key={m.id}
                 className={cn(
-                  "flex flex-wrap items-center justify-between gap-3 px-5 py-3.5",
-                  i > 0 && "border-t border-border/50",
+                  "flex flex-wrap items-center justify-between gap-3 px-4 py-3",
+                  i > 0 && "border-t",
                 )}
               >
                 <div>
@@ -566,7 +556,8 @@ export default function KnowledgeBaseDetailPage() {
             ))}
           </ul>
         )}
-      </section>
+        </CardContent>
+      </Card>
     </div>
   );
 }

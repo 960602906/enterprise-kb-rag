@@ -42,7 +42,7 @@ export async function loginAction(
     await signIn("credentials", {
       email: parsed.data.email,
       password: parsed.data.password,
-      redirectTo: "/knowledge-bases",
+      redirectTo: "/overview",
     });
     return { ok: true };
   } catch (err) {
@@ -95,7 +95,7 @@ export async function registerAction(
     await signIn("credentials", {
       email: parsed.data.email,
       password: parsed.data.password,
-      redirectTo: "/knowledge-bases",
+      redirectTo: "/overview",
     });
     return { ok: true };
   } catch (err) {

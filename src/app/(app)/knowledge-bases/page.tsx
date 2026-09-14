@@ -20,6 +20,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, ErrorState } from "@/components/layout/states";
+import { PageHeader } from "@/components/layout/page-header";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { translateApiError, useI18n } from "@/lib/i18n";
 
 type KnowledgeBase = {
@@ -103,17 +111,8 @@ export default function KnowledgeBasesPage() {
   }
 
   return (
-    <div className="animate-fade-up space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1.5">
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">
-            {t("kb.title")}
-          </h1>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            {t("kb.subtitle")}
-          </p>
-        </div>
-
+    <div className="space-y-4">
+      <PageHeader title={t("kb.title")} description={t("kb.subtitle")}>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -166,22 +165,18 @@ export default function KnowledgeBasesPage() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      </PageHeader>
 
       {loading && (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2, 3].map((i) => (
-            <li
-              key={i}
-              className="surface rounded-2xl p-5"
-              style={{ animationDelay: `${i * 70}ms` }}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="h-5 w-40 animate-pulse rounded-md bg-muted" />
-                <div className="h-5 w-12 animate-pulse rounded-full bg-muted" />
-              </div>
-              <div className="mt-3 h-3 w-full animate-pulse rounded bg-muted/80" />
-              <div className="mt-2 h-3 w-2/3 animate-pulse rounded bg-muted/80" />
+            <li key={i}>
+              <Card>
+                <CardHeader>
+                  <div className="h-5 w-40 animate-pulse rounded-md bg-muted" />
+                  <div className="mt-2 h-3 w-full animate-pulse rounded bg-muted/80" />
+                </CardHeader>
+              </Card>
             </li>
           ))}
         </ul>
@@ -214,28 +209,29 @@ export default function KnowledgeBasesPage() {
       )}
 
       {!loading && !error && items.length > 0 && (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((kb) => (
             <li key={kb.id}>
-              <Link
-                href={`/knowledge-bases/${kb.id}`}
-                className="group surface flex h-full flex-col rounded-2xl p-5 transition-colors hover:border-border hover:bg-card"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <p className="font-heading text-lg font-semibold tracking-tight group-hover:text-primary">
-                    {kb.name}
-                  </p>
-                  {kb.role && (
-                    <Badge variant="secondary" className="shrink-0">
-                      {t(kb.role === "manage" ? "roles.manage" : "roles.read")}
-                    </Badge>
-                  )}
-                </div>
-                {kb.description && (
-                  <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-                    {kb.description}
-                  </p>
-                )}
+              <Link href={`/knowledge-bases/${kb.id}`} className="block h-full">
+                <Card className="h-full transition-colors hover:bg-muted/40">
+                  <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+                    <CardTitle className="text-base">{kb.name}</CardTitle>
+                    {kb.role && (
+                      <Badge variant="secondary" className="shrink-0">
+                        {t(
+                          kb.role === "manage" ? "roles.manage" : "roles.read",
+                        )}
+                      </Badge>
+                    )}
+                  </CardHeader>
+                  {kb.description ? (
+                    <CardContent>
+                      <CardDescription className="line-clamp-2">
+                        {kb.description}
+                      </CardDescription>
+                    </CardContent>
+                  ) : null}
+                </Card>
               </Link>
             </li>
           ))}

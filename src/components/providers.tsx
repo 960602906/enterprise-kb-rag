@@ -13,7 +13,7 @@ export function Providers({
 }) {
   return (
     <SessionProvider>
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <LocaleProvider initialLocale={initialLocale}>{children}</LocaleProvider>
       </ThemeProvider>
     </SessionProvider>

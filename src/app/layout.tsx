@@ -1,21 +1,14 @@
 import type { Metadata } from "next";
-import { DM_Sans, Source_Serif_4 } from "next/font/google";
+import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "@/components/providers";
 import { localeToHtmlLang } from "@/lib/i18n/config";
 import { getRequestLocale, getServerTranslator } from "@/lib/i18n/server";
 import "./globals.css";
 
-const dmSans = DM_Sans({
-  variable: "--font-dm-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const sourceSerif = Source_Serif_4({
-  variable: "--font-source-serif",
-  subsets: ["latin"],
-  weight: ["400", "600", "700"],
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -36,7 +29,7 @@ export default async function RootLayout({
   return (
     <html
       lang={localeToHtmlLang(locale)}
-      className={`${dmSans.variable} ${sourceSerif.variable} h-full antialiased`}
+      className={`${inter.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col font-sans">

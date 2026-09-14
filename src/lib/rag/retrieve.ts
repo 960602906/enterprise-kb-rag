@@ -6,6 +6,7 @@ import {
   type DocType,
 } from "./chunk-config";
 import { embedText } from "./embed";
+import { getRetrievalConfig } from "./retrieval-config";
 import { expandSynonymTerms } from "./synonyms";
 
 export type RetrievedChunk = CitationPayload & {
@@ -89,15 +90,18 @@ export async function hybridRetrieve(options: {
   topK?: number;
   vectorWeight?: number;
   keywordWeight?: number;
+  minHybridScore?: number;
   /** When set, prefer chunks whose metadata.docType matches; untagged chunks stay eligible. */
   docTypes?: DocType[];
 }): Promise<RetrievedChunk[]> {
+  const cfg = getRetrievalConfig();
   const {
     query,
     permittedKbIds,
-    topK = 8,
-    vectorWeight = 0.65,
-    keywordWeight = 0.35,
+    topK = cfg.topK,
+    vectorWeight = cfg.vectorWeight,
+    keywordWeight = cfg.keywordWeight,
+    minHybridScore = cfg.minHybridScore,
     docTypes,
   } = options;
 
@@ -106,7 +110,10 @@ export async function hybridRetrieve(options: {
   const queryEmbedding = await embedText(query);
   const embeddingLiteral = `[${queryEmbedding.join(",")}]`;
   const kbArrayLiteral = `{${permittedKbIds.join(",")}}`;
-  const candidateLimit = Math.max(topK * 3, 24);
+  const candidateLimit = Math.max(
+    topK * cfg.candidateMultiplier,
+    cfg.candidateMin,
+  );
   const docTypeClause = docTypeFilterSql(docTypes);
 
   const vectorRows = await db.execute<RetrievalRow>(sql`
@@ -216,7 +223,7 @@ export async function hybridRetrieve(options: {
     .sort((a, b) => b.hybridScore - a.hybridScore)
     .slice(0, topK)
     .map((r) => ({ ...r, score: r.hybridScore }))
-    .filter((r) => r.hybridScore >= 0.08);
+    .filter((r) => r.hybridScore >= minHybridScore);
 }
 
 type RetrievalRow = {

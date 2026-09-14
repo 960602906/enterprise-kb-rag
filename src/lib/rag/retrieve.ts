@@ -6,7 +6,7 @@ import {
   type DocType,
 } from "./chunk-config";
 import { embedText } from "./embed";
-import { getRetrievalConfig } from "./retrieval-config";
+import { getRetrievalConfig, type RetrievalFusion } from "./retrieval-config";
 import { expandSynonymTerms } from "./synonyms";
 
 export type RetrievedChunk = CitationPayload & {
@@ -20,7 +20,7 @@ export type RetrievedChunk = CitationPayload & {
 };
 
 /**
- * Hybrid retrieval: vector cosine + keyword (FTS for Latin, bigrams for CJK).
+ * Hybrid retrieval: vector cosine + keyword (english FTS, CJK trigram / ILIKE).
  *
  * CRITICAL: `permittedKbIds` must already be ACL-filtered.
  * Never retrieve-then-post-filter — WHERE constrains KB ids.
@@ -91,6 +91,14 @@ export function extractKeywordTerms(query: string): string[] {
   return terms;
 }
 
+export function reciprocalRankScore(
+  rank: number,
+  k: number,
+  weight: number,
+): number {
+  return weight / (k + rank);
+}
+
 export async function hybridRetrieve(options: {
   query: string;
   permittedKbIds: string[];
@@ -98,6 +106,7 @@ export async function hybridRetrieve(options: {
   vectorWeight?: number;
   keywordWeight?: number;
   minHybridScore?: number;
+  fusion?: RetrievalFusion;
   /** When set, prefer chunks whose metadata.docType matches; untagged chunks stay eligible. */
   docTypes?: DocType[];
 }): Promise<RetrievedChunk[]> {
@@ -109,6 +118,7 @@ export async function hybridRetrieve(options: {
     vectorWeight = cfg.vectorWeight,
     keywordWeight = cfg.keywordWeight,
     minHybridScore = cfg.minHybridScore,
+    fusion = cfg.fusion,
     docTypes,
   } = options;
 
@@ -154,6 +164,7 @@ export async function hybridRetrieve(options: {
 
   const keywordTerms = extractKeywordTerms(query);
   const termsLiteral = `{${keywordTerms.map((t) => JSON.stringify(t)).join(",")}}`;
+  const trgmFloor = cfg.trgmMinSimilarity;
 
   const keywordRows = await db.execute<RetrievalRow>(sql`
     SELECT
@@ -169,12 +180,13 @@ export async function hybridRetrieve(options: {
       (
         ${ftsScore}
         + COALESCE((
-            SELECT COUNT(*)::float
+            SELECT SUM(word_similarity(t.term, c.content))::float
             FROM unnest(${termsLiteral}::text[]) AS t(term)
-            WHERE length(t.term) > 0 AND c.content ILIKE ('%' || t.term || '%')
+            WHERE length(t.term) > 0
           ), 0)
         + CASE
             WHEN d.title ILIKE ('%' || ${query} || '%') THEN 2
+            WHEN word_similarity(${query}, d.title) >= ${trgmFloor} THEN 1
             ELSE 0
           END
       )::float AS keyword_score
@@ -188,7 +200,10 @@ export async function hybridRetrieve(options: {
           cardinality(${termsLiteral}::text[]) > 0
           AND EXISTS (
             SELECT 1 FROM unnest(${termsLiteral}::text[]) AS t(term)
-            WHERE length(t.term) > 0 AND c.content ILIKE ('%' || t.term || '%')
+            WHERE length(t.term) > 0 AND (
+              c.content ILIKE ('%' || t.term || '%')
+              OR word_similarity(t.term, c.content) >= ${trgmFloor}
+            )
           )
         )
       )
@@ -197,47 +212,77 @@ export async function hybridRetrieve(options: {
     LIMIT ${candidateLimit}
   `);
 
+  return fuseRetrieved({
+    vectorRows: [...vectorRows],
+    keywordRows: [...keywordRows],
+    fusion,
+    vectorWeight,
+    keywordWeight,
+    rrfK: cfg.rrfK,
+    topK,
+    minHybridScore,
+  });
+}
+
+function fuseRetrieved(opts: {
+  vectorRows: RetrievalRow[];
+  keywordRows: RetrievalRow[];
+  fusion: RetrievalFusion;
+  vectorWeight: number;
+  keywordWeight: number;
+  rrfK: number;
+  topK: number;
+  minHybridScore: number;
+}): RetrievedChunk[] {
   const fused = new Map<string, RetrievedChunk>();
   const maxVec = Math.max(
-    ...vectorRows.map((r) => Number(r.vector_score) || 0),
+    ...opts.vectorRows.map((r) => Number(r.vector_score) || 0),
     1e-9,
   );
   const maxKw = Math.max(
-    ...keywordRows.map((r) => Number(r.keyword_score) || 0),
+    ...opts.keywordRows.map((r) => Number(r.keyword_score) || 0),
     1e-9,
   );
 
-  for (const row of vectorRows) {
+  opts.vectorRows.forEach((row, index) => {
     const vectorScore = Number(row.vector_score) || 0;
+    const rankScore =
+      opts.fusion === "rrf"
+        ? reciprocalRankScore(index + 1, opts.rrfK, opts.vectorWeight)
+        : (vectorScore / maxVec) * opts.vectorWeight;
     fused.set(row.id, {
       ...mapRetrievalRow(row),
       vectorScore,
-      hybridScore: (vectorScore / maxVec) * vectorWeight,
+      hybridScore: rankScore,
       score: 0,
     });
-  }
+  });
 
-  for (const row of keywordRows) {
+  opts.keywordRows.forEach((row, index) => {
     const keywordScore = Number(row.keyword_score) || 0;
+    const rankScore =
+      opts.fusion === "rrf"
+        ? reciprocalRankScore(index + 1, opts.rrfK, opts.keywordWeight)
+        : (keywordScore / maxKw) * opts.keywordWeight;
     const existing = fused.get(row.id);
     if (existing) {
       existing.keywordScore = keywordScore;
-      existing.hybridScore += (keywordScore / maxKw) * keywordWeight;
+      existing.hybridScore += rankScore;
     } else {
       fused.set(row.id, {
         ...mapRetrievalRow(row),
         keywordScore,
-        hybridScore: (keywordScore / maxKw) * keywordWeight,
+        hybridScore: rankScore,
         score: 0,
       });
     }
-  }
+  });
 
   return [...fused.values()]
     .sort((a, b) => b.hybridScore - a.hybridScore)
-    .slice(0, topK)
+    .slice(0, opts.topK)
     .map((r) => ({ ...r, score: r.hybridScore }))
-    .filter((r) => r.hybridScore >= minHybridScore);
+    .filter((r) => r.hybridScore >= opts.minHybridScore);
 }
 
 type RetrievalRow = {

@@ -104,4 +104,41 @@ export async function processDocument(documentId: string): Promise<void> {
   }
 }
 
+/** Remove the stored object then the row (chunks / ingest_jobs cascade). */
+export async function deleteDocument(documentId: string): Promise<boolean> {
+  const [doc] = await db
+    .select()
+    .from(documents)
+    .where(eq(documents.id, documentId))
+    .limit(1);
+  if (!doc) return false;
+
+  try {
+    await getObjectStore().remove(doc.storagePath);
+  } catch {
+    /* locator already gone or unreadable */
+  }
+
+  await db.delete(documents).where(eq(documents.id, documentId));
+  return true;
+}
+
+/** Best-effort object cleanup before a knowledge-base row delete. */
+export async function deleteKnowledgeBaseObjects(
+  knowledgeBaseId: string,
+): Promise<void> {
+  const rows = await db
+    .select({ storagePath: documents.storagePath })
+    .from(documents)
+    .where(eq(documents.knowledgeBaseId, knowledgeBaseId));
+  const store = getObjectStore();
+  for (const row of rows) {
+    try {
+      await store.remove(row.storagePath);
+    } catch {
+      /* continue */
+    }
+  }
+}
+
 export { objectKey };

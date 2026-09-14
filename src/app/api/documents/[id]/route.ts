@@ -4,16 +4,15 @@ import { auth } from "@/lib/auth";
 import { AccessError, requireKbAccess, requireUserId } from "@/lib/auth/acl";
 import { db } from "@/lib/db";
 import { documents } from "@/lib/db/schema";
-import { deleteDocument, processDocument } from "@/lib/rag";
+import { deleteDocument } from "@/lib/rag";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function POST(_req: Request, ctx: Ctx) {
+export async function GET(_req: Request, ctx: Ctx) {
   try {
     const session = await auth();
     const userId = await requireUserId(session);
     const { id } = await ctx.params;
-
     const [doc] = await db
       .select()
       .from(documents)
@@ -22,28 +21,16 @@ export async function POST(_req: Request, ctx: Ctx) {
     if (!doc) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-
-    await requireKbAccess(userId, doc.knowledgeBaseId, "manage");
-    await processDocument(id);
-
-    const [updated] = await db
-      .select()
-      .from(documents)
-      .where(eq(documents.id, id))
-      .limit(1);
-
-    return NextResponse.json({ item: updated });
+    await requireKbAccess(userId, doc.knowledgeBaseId, "read");
+    return NextResponse.json({ item: doc });
   } catch (err) {
     if (err instanceof AccessError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
-    console.error(err);
-    const message = err instanceof Error ? err.message : "Processing failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Lookup failed" }, { status: 500 });
   }
 }
 
-/** @deprecated Prefer DELETE /api/documents/:id */
 export async function DELETE(_req: Request, ctx: Ctx) {
   try {
     const session = await auth();

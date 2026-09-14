@@ -1,6 +1,8 @@
 export { chunkText, estimateTokens } from "./chunk";
 export {
+  DEFAULT_CHUNK,
   SKYROC_CHUNK,
+  defaultSearchKnowledgeBaseName,
   SKYROC_KNOWLEDGE_BASE_NAME,
   DOC_TYPES,
   inferDocType,
@@ -16,11 +18,8 @@ export {
   hybridRetrieve,
   buildContextBlock,
   makeSnippet,
+  assertChunksPermitted,
   type RetrievedChunk,
 } from "./retrieve";
-export {
-  processDocument,
-  enqueueDocumentProcessing,
-  ensureUploadDir,
-  getUploadRoot,
-} from "./ingest";
+export { processDocument, ensureUploadDir, getUploadRoot, objectKey } from "./ingest";
+export { enqueueDocumentProcessing, drainIngestQueue } from "@/lib/jobs/ingest-queue";

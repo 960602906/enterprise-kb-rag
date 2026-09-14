@@ -1,37 +1,42 @@
 /**
- * SkyRoc / Atlas KB chunking + corpus rules.
+ * Generic chunking + document-type heuristics for Atlas KB.
  *
- * SearchKnowledge (POST /api/search-knowledge) is a read-only retrieval bypass
- * for SkyRoc. Callers must treat returned snippets as context only — never as
- * license to invent flows, field values, or DB writes.
- *
- * Corpus allowlist (ingest these; never source code or production DB dumps):
- *   - docs/frontend-admin/business-flows/*
- *   - 单据变更流水推广任务.md
- *   - testing/联调
- *
- * TODO: persist explicit docType/sourcePath on the document row for operators
- * who upload via the UI without SkyRoc-style paths (partially done via
- * documents.metadata). Re-process legacy chunks so metadata.docType is tagged.
+ * Domain-specific corpora (internal handbooks, ERP flows, etc.) should
+ * set metadata on upload (`docType`, `sourcePath`) rather than hard-coding
+ * product names in this module.
  */
 
 export const DOC_TYPES = ["flow", "rule", "faq"] as const;
 export type DocType = (typeof DOC_TYPES)[number];
 
-/** Dedicated KB used when SearchKnowledge is called without knowledgeBaseIds. */
-export const SKYROC_KNOWLEDGE_BASE_NAME = "SkyRoc Docs";
+/**
+ * KB used when the service search API is called without `knowledgeBaseIds`
+ * and `SEARCH_KNOWLEDGE_KB_IDS` is unset.
+ *
+ * Override with SEARCH_KNOWLEDGE_DEFAULT_KB_NAME. Never fall back to
+ * "every knowledge base in the database".
+ */
+export function defaultSearchKnowledgeBaseName(): string {
+  return (
+    process.env.SEARCH_KNOWLEDGE_DEFAULT_KB_NAME?.trim() || "Internal Docs"
+  );
+}
+
+/** @deprecated Use defaultSearchKnowledgeBaseName() */
+export const SKYROC_KNOWLEDGE_BASE_NAME = "Internal Docs";
 
 /**
- * Target window for SkyRoc markdown (business-flows, rules, FAQs).
- * Prefer heading / numbered-step boundaries over mid-sentence cuts.
+ * Target window for markdown / prose. Prefer heading and numbered-step
+ * boundaries over mid-sentence cuts.
  */
-export const SKYROC_CHUNK = {
-  /** Inclusive lower bound before a heading flush (~400–800 tokens). */
+export const DEFAULT_CHUNK = {
   minTokens: 400,
   maxTokens: 800,
-  /** Overlap ~80–120 tokens between adjacent windows. */
   overlapTokens: 100,
 } as const;
+
+/** @deprecated Use DEFAULT_CHUNK */
+export const SKYROC_CHUNK = DEFAULT_CHUNK;
 
 export type ChunkMetadata = {
   docType?: DocType;
@@ -70,13 +75,13 @@ export function inferDocType(input: {
   ) {
     return "flow";
   }
-  if (/rule|规则|policy|政策|制度/.test(blob)) return "rule";
+  if (/rule|规则|policy|政策|制度|handbook/.test(blob)) return "rule";
   return undefined;
 }
 
 /**
- * Prefer the original corpus path (e.g. docs/frontend-admin/business-flows/x.md)
- * over the local uuid-prefixed upload path.
+ * Prefer an original corpus-relative path over a local uuid-prefixed
+ * upload path when the filename already contains directories.
  */
 export function inferSourcePath(
   filename: string,
@@ -86,11 +91,8 @@ export function inferSourcePath(
   if (normalizedName.includes("/")) return normalizedName;
   if (storagePath) {
     const posix = storagePath.replace(/\\/g, "/");
-    const marker = "/business-flows/";
-    const idx = posix.toLowerCase().indexOf("docs/");
-    if (idx >= 0) return posix.slice(idx);
-    const flowIdx = posix.toLowerCase().indexOf(marker.slice(1));
-    if (flowIdx >= 0) return posix.slice(flowIdx);
+    const docsIdx = posix.toLowerCase().indexOf("docs/");
+    if (docsIdx >= 0) return posix.slice(docsIdx);
   }
   return normalizedName;
 }

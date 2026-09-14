@@ -112,9 +112,20 @@ src/app/(app)/chat            Multi-KB RAG chat + citations
 src/app/api/                  REST + streaming chat
 src/lib/auth                  Auth.js + ACL helpers
 src/lib/db                    Drizzle schema + client
+src/lib/i18n                  UI chrome strings (zh / en)
 src/lib/rag                   Parse, chunk, embed, retrieve
 samples/                      Sample docs for testing
 ```
+
+## UI language (zh / en)
+
+Chrome (nav, forms, buttons, statuses, toasts) is localized with a small dictionary + React context. Preference is stored in the `atlas-locale` cookie (and localStorage), default **zh**. Uploaded documents and RAG model answers are **not** translated.
+
+To add a string:
+
+1. Add the same key under both `en` and `zh` in [`src/lib/i18n/messages.ts`](./src/lib/i18n/messages.ts)
+2. In a client component: `const { t } = useI18n()` then `{t("section.key")}`
+3. Interpolate with `{name}` placeholders, e.g. `t("docs.chunks", { count: 12 })`
 
 ## ACL before retrieve
 

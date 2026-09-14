@@ -14,8 +14,15 @@ const credentialsSchema = z.object({
   name: z.string().max(120).optional(),
 });
 
+export type AuthErrorKey =
+  | "invalidCredentials"
+  | "registerDisabled"
+  | "registerInvalid"
+  | "emailTaken"
+  | "signInAfterRegisterFailed";
+
 export type AuthFormState = {
-  error?: string;
+  error?: AuthErrorKey;
   ok?: boolean;
 };
 
@@ -28,7 +35,7 @@ export async function loginAction(
 
   const parsed = credentialsSchema.safeParse({ email, password });
   if (!parsed.success) {
-    return { error: "Invalid email or password / 邮箱或密码无效" };
+    return { error: "invalidCredentials" };
   }
 
   try {
@@ -40,7 +47,7 @@ export async function loginAction(
     return { ok: true };
   } catch (err) {
     if (err instanceof AuthError) {
-      return { error: "Invalid email or password / 邮箱或密码错误" };
+      return { error: "invalidCredentials" };
     }
     // Next.js redirect throws; rethrow so navigation works
     throw err;
@@ -52,7 +59,7 @@ export async function registerAction(
   formData: FormData,
 ): Promise<AuthFormState> {
   if (process.env.DISABLE_REGISTER === "true") {
-    return { error: "Registration disabled / 已关闭注册" };
+    return { error: "registerDisabled" };
   }
 
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -64,7 +71,7 @@ export async function registerAction(
     .safeParse({ email, password, name: name || undefined });
 
   if (!parsed.success) {
-    return { error: "Check your email and password (min 8 chars) / 请检查邮箱和密码" };
+    return { error: "registerInvalid" };
   }
 
   const [existing] = await db
@@ -74,7 +81,7 @@ export async function registerAction(
     .limit(1);
 
   if (existing) {
-    return { error: "Email already registered / 邮箱已注册" };
+    return { error: "emailTaken" };
   }
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 10);
@@ -93,7 +100,7 @@ export async function registerAction(
     return { ok: true };
   } catch (err) {
     if (err instanceof AuthError) {
-      return { error: "Account created but sign-in failed / 账号已创建但登录失败" };
+      return { error: "signInAfterRegisterFailed" };
     }
     throw err;
   }

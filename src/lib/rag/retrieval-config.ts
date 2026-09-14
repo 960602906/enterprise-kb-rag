@@ -1,6 +1,8 @@
 import { readFileSync } from "fs";
 import path from "path";
 
+export type RetrievalFusion = "rrf" | "weighted";
+
 export type RetrievalConfig = {
   topK: number;
   vectorWeight: number;
@@ -8,15 +10,21 @@ export type RetrievalConfig = {
   minHybridScore: number;
   candidateMultiplier: number;
   candidateMin: number;
+  fusion: RetrievalFusion;
+  rrfK: number;
+  trgmMinSimilarity: number;
 };
 
 const DEFAULTS: RetrievalConfig = {
   topK: 8,
   vectorWeight: 0.65,
   keywordWeight: 0.35,
-  minHybridScore: 0.08,
+  minHybridScore: 0,
   candidateMultiplier: 3,
   candidateMin: 24,
+  fusion: "rrf",
+  rrfK: 60,
+  trgmMinSimilarity: 0.35,
 };
 
 let cached: { path: string; value: RetrievalConfig } | null = null;
@@ -45,8 +53,14 @@ export function getRetrievalConfig(): RetrievalConfig {
     vectorWeight: num(fileCfg.vectorWeight, DEFAULTS.vectorWeight),
     keywordWeight: num(fileCfg.keywordWeight, DEFAULTS.keywordWeight),
     minHybridScore: num(fileCfg.minHybridScore, DEFAULTS.minHybridScore),
-    candidateMultiplier: num(fileCfg.candidateMultiplier, DEFAULTS.candidateMultiplier),
+    candidateMultiplier: num(
+      fileCfg.candidateMultiplier,
+      DEFAULTS.candidateMultiplier,
+    ),
     candidateMin: num(fileCfg.candidateMin, DEFAULTS.candidateMin),
+    fusion: fusionOf(fileCfg.fusion, DEFAULTS.fusion),
+    rrfK: num(fileCfg.rrfK, DEFAULTS.rrfK),
+    trgmMinSimilarity: num(fileCfg.trgmMinSimilarity, DEFAULTS.trgmMinSimilarity),
   };
   cached = { path: filePath, value: merged };
   return applyEnvOverrides(merged);
@@ -58,9 +72,22 @@ function applyEnvOverrides(base: RetrievalConfig): RetrievalConfig {
     vectorWeight: envFloat("RETRIEVAL_VECTOR_WEIGHT", base.vectorWeight),
     keywordWeight: envFloat("RETRIEVAL_KEYWORD_WEIGHT", base.keywordWeight),
     minHybridScore: envFloat("RETRIEVAL_MIN_HYBRID_SCORE", base.minHybridScore),
-    candidateMultiplier: envInt("RETRIEVAL_CANDIDATE_MULTIPLIER", base.candidateMultiplier),
+    candidateMultiplier: envInt(
+      "RETRIEVAL_CANDIDATE_MULTIPLIER",
+      base.candidateMultiplier,
+    ),
     candidateMin: envInt("RETRIEVAL_CANDIDATE_MIN", base.candidateMin),
+    fusion: fusionOf(process.env.RETRIEVAL_FUSION, base.fusion),
+    rrfK: envInt("RETRIEVAL_RRF_K", base.rrfK),
+    trgmMinSimilarity: envFloat(
+      "RETRIEVAL_TRGM_MIN_SIMILARITY",
+      base.trgmMinSimilarity,
+    ),
   };
+}
+
+function fusionOf(value: unknown, fallback: RetrievalFusion): RetrievalFusion {
+  return value === "weighted" || value === "rrf" ? value : fallback;
 }
 
 function num(value: unknown, fallback: number): number {

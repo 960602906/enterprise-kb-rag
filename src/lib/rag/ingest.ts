@@ -1,30 +1,23 @@
 import { eq, sql } from "drizzle-orm";
-import { mkdir, readFile } from "fs/promises";
-import path from "path";
 import { db } from "@/lib/db";
 import { chunks, documents } from "@/lib/db/schema";
+import { getObjectStore, getUploadRoot, objectKey } from "@/lib/storage";
 import { chunkText } from "./chunk";
-import { buildChunkMetadata, SKYROC_CHUNK } from "./chunk-config";
+import { buildChunkMetadata, DEFAULT_CHUNK } from "./chunk-config";
 import { embedTexts } from "./embed";
 import { parseFile } from "./parse";
 
-const UPLOAD_ROOT =
-  process.env.UPLOAD_DIR ?? path.join(process.cwd(), "uploads");
+export { getUploadRoot };
 
-export function getUploadRoot() {
-  return UPLOAD_ROOT;
-}
-
+/** @deprecated Use getObjectStore().put — kept for corpus scripts. */
 export async function ensureUploadDir(...parts: string[]) {
-  const dir = path.join(/* turbopackIgnore: true */ UPLOAD_ROOT, ...parts);
+  const { mkdir } = await import("fs/promises");
+  const path = await import("path");
+  const dir = path.join(getUploadRoot(), ...parts);
   await mkdir(dir, { recursive: true });
   return dir;
 }
 
-/**
- * Ingest a document: parse → chunk → embed → store.
- * Safe for on-request local/dev; prefer a queue on Vercel for large files.
- */
 export async function processDocument(documentId: string): Promise<void> {
   const [doc] = await db
     .select()
@@ -44,13 +37,14 @@ export async function processDocument(documentId: string): Promise<void> {
     .where(eq(documents.id, documentId));
 
   try {
-    const buffer = await readFile(doc.storagePath);
+    const store = getObjectStore();
+    const buffer = await store.get(doc.storagePath);
     const parsed = await parseFile(buffer, doc.mimeType, doc.filename);
     const chunkMeta = buildChunkMetadata(doc);
     const textChunks = chunkText(parsed.text, {
-      minTokens: SKYROC_CHUNK.minTokens,
-      maxTokens: SKYROC_CHUNK.maxTokens,
-      overlapTokens: SKYROC_CHUNK.overlapTokens,
+      minTokens: DEFAULT_CHUNK.minTokens,
+      maxTokens: DEFAULT_CHUNK.maxTokens,
+      overlapTokens: DEFAULT_CHUNK.overlapTokens,
       preferStepBoundaries: chunkMeta.docType === "flow",
     });
 
@@ -59,38 +53,30 @@ export async function processDocument(documentId: string): Promise<void> {
     }
 
     await db.delete(chunks).where(eq(chunks.documentId, documentId));
-
     const embeddings = await embedTexts(textChunks.map((c) => c.content));
 
-    const batchSize = 32;
-    for (let i = 0; i < textChunks.length; i += batchSize) {
-      const slice = textChunks.slice(i, i + batchSize);
-      const embSlice = embeddings.slice(i, i + batchSize);
-
-      for (let j = 0; j < slice.length; j++) {
-        const c = slice[j];
-        const embeddingLiteral = `[${embSlice[j].join(",")}]`;
-
-        await db.execute(sql`
-          INSERT INTO chunks (
-            id, document_id, knowledge_base_id, chunk_index, content,
-            token_count, page_number, heading_path, embedding, tsv, metadata, created_at
-          ) VALUES (
-            gen_random_uuid(),
-            ${documentId}::uuid,
-            ${doc.knowledgeBaseId}::uuid,
-            ${i + j},
-            ${c.content},
-            ${c.tokenCount},
-            ${c.pageNumber ?? null},
-            ${c.headingPath ?? null},
-            ${embeddingLiteral}::vector,
-            to_tsvector('english', ${c.content}),
-            ${JSON.stringify(chunkMeta)}::jsonb,
-            now()
-          )
-        `);
-      }
+    for (let i = 0; i < textChunks.length; i++) {
+      const c = textChunks[i];
+      const embeddingLiteral = `[${embeddings[i].join(",")}]`;
+      await db.execute(sql`
+        INSERT INTO chunks (
+          id, document_id, knowledge_base_id, chunk_index, content,
+          token_count, page_number, heading_path, embedding, tsv, metadata, created_at
+        ) VALUES (
+          gen_random_uuid(),
+          ${documentId}::uuid,
+          ${doc.knowledgeBaseId}::uuid,
+          ${i},
+          ${c.content},
+          ${c.tokenCount},
+          ${c.pageNumber ?? null},
+          ${c.headingPath ?? null},
+          ${embeddingLiteral}::vector,
+          to_tsvector('english', ${c.content}),
+          ${JSON.stringify(chunkMeta)}::jsonb,
+          now()
+        )
+      `);
     }
 
     await db
@@ -118,9 +104,4 @@ export async function processDocument(documentId: string): Promise<void> {
   }
 }
 
-/** Fire-and-forget processing for local/dev uploads. */
-export function enqueueDocumentProcessing(documentId: string): void {
-  void processDocument(documentId).catch((err) => {
-    console.error(`[ingest] Failed to process ${documentId}:`, err);
-  });
-}
+export { objectKey };

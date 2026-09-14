@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { ingestJobs } from "@/lib/db/schema";
+import { ingestJobs } from "@/lib/db/ingest-jobs";
 import { processDocument } from "@/lib/rag/ingest";
 
 export type IngestJobStatus = "queued" | "running" | "succeeded" | "failed";
@@ -165,7 +165,7 @@ async function runClaimedJob(
         lockedBy: null,
         updatedAt: new Date(),
       })
-    .where(eq(ingestJobs.id, jobId));
+      .where(eq(ingestJobs.id, jobId));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const retry = attempts < maxAttempts;

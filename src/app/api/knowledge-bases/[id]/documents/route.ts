@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import path from "path";
-import { writeFile } from "fs/promises";
 import { randomUUID } from "crypto";
 import { auth } from "@/lib/auth";
 import { AccessError, requireKbAccess, requireUserId } from "@/lib/auth/acl";
@@ -8,12 +6,13 @@ import { db } from "@/lib/db";
 import { documents } from "@/lib/db/schema";
 import {
   enqueueDocumentProcessing,
-  ensureUploadDir,
   inferDocType,
   inferSourcePath,
   isAllowedUpload,
   isDocType,
+  objectKey,
 } from "@/lib/rag";
+import { getObjectStore } from "@/lib/storage";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -53,12 +52,15 @@ export async function POST(req: Request, ctx: Ctx) {
       );
     }
 
-    const dir = await ensureUploadDir(knowledgeBaseId);
     const safeName = file.name.replace(/[^\w.\-()\s\u4e00-\u9fff]/g, "_");
     const storedName = `${randomUUID()}-${safeName}`;
-    const storagePath = path.join(dir, storedName);
+    const key = objectKey(knowledgeBaseId, storedName);
     const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(storagePath, buffer);
+    const stored = await getObjectStore().put(
+      key,
+      buffer,
+      file.type || "application/octet-stream",
+    );
 
     const title =
       (form.get("title") as string | null)?.trim() ||
@@ -66,7 +68,7 @@ export async function POST(req: Request, ctx: Ctx) {
 
     const explicitSource = (form.get("sourcePath") as string | null)?.trim();
     const sourcePath =
-      explicitSource || inferSourcePath(safeName, storagePath);
+      explicitSource || inferSourcePath(safeName, stored.locator);
     const docType = inferDocType({
       filename: safeName,
       sourcePath,
@@ -81,8 +83,8 @@ export async function POST(req: Request, ctx: Ctx) {
         title,
         filename: safeName,
         mimeType: file.type || "application/octet-stream",
-        fileSize: file.size,
-        storagePath,
+        fileSize: stored.bytes,
+        storagePath: stored.locator,
         status: "pending",
         uploadedById: userId,
         metadata: {

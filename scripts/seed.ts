@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { SKYROC_KNOWLEDGE_BASE_NAME } from "../src/lib/rag/chunk-config";
+import { defaultSearchKnowledgeBaseName } from "../src/lib/rag/chunk-config";
 import {
   kbMembers,
   knowledgeBases,
@@ -79,27 +79,28 @@ async function main() {
     console.log(`Created knowledge base: ${kb.name}`);
   }
 
-  let [skyrocKb] = await db
+  const internalName = defaultSearchKnowledgeBaseName();
+  let [internalKb] = await db
     .select()
     .from(knowledgeBases)
-    .where(eq(knowledgeBases.name, SKYROC_KNOWLEDGE_BASE_NAME));
+    .where(eq(knowledgeBases.name, internalName));
 
-  if (!skyrocKb) {
-    [skyrocKb] = await db
+  if (!internalKb) {
+    [internalKb] = await db
       .insert(knowledgeBases)
       .values({
-        name: SKYROC_KNOWLEDGE_BASE_NAME,
+        name: internalName,
         description:
-          "Read-only corpus for SkyRoc SearchKnowledge (business-flows, rules, FAQs).",
+          "Default knowledge base for the service SearchKnowledge API when no KB ids are passed.",
         ownerId: admin.id,
       })
       .returning();
 
     await db.insert(kbMembers).values([
-      { knowledgeBaseId: skyrocKb.id, userId: admin.id, role: "manage" },
-      { knowledgeBaseId: skyrocKb.id, userId: member.id, role: "read" },
+      { knowledgeBaseId: internalKb.id, userId: admin.id, role: "manage" },
+      { knowledgeBaseId: internalKb.id, userId: member.id, role: "read" },
     ]);
-    console.log(`Created knowledge base: ${skyrocKb.name}`);
+    console.log(`Created knowledge base: ${internalKb.name}`);
   }
 
   console.log("\nSeed complete. Sign in with:");

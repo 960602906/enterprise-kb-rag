@@ -6,6 +6,7 @@ import {
   type DocType,
 } from "./chunk-config";
 import { embedText } from "./embed";
+import { expandSynonymTerms } from "./synonyms";
 
 export type RetrievedChunk = CitationPayload & {
   content: string;
@@ -49,6 +50,8 @@ const CJK_STOP = new Set([
  * Keyword terms for hybrid retrieval.
  * ASCII: word tokens. CJK: overlapping bigrams (stopwords dropped) so
  * queries like「售后怎么查」still hit chunks containing「售后」.
+ * Domain expansions come from config/retrieval-synonyms.json
+ * (override with SYNONYM_CONFIG_PATH).
  */
 export function extractKeywordTerms(query: string): string[] {
   const terms: string[] = [];
@@ -71,19 +74,11 @@ export function extractKeywordTerms(query: string): string[] {
     for (let i = 0; i + 1 < run.length; i++) {
       add(run.slice(i, i + 2));
     }
-    // Also keep full run when short (2–6 chars) for exact phrase boost
     if (run.length >= 2 && run.length <= 6) add(run);
   }
-  // Domain synonym expansion for short Chinese ops questions (SkyRoc corpus).
+
   const blob = query.replace(/\s+/g, "");
-  const synonymBags: [RegExp, string[]][] = [
-    [/审后|销售明细|改明细|修改明细/, ["修改商品明细", "订单修改", "审核后", "销售订单", "UpdateStatus"]],
-    [/采购入库|入库草稿/, ["采购入库", "草稿", "审核", "入库"]],
-    [/售后/, ["售后列表", "售后单", "查询"]],
-  ];
-  for (const [re, extras] of synonymBags) {
-    if (re.test(blob)) for (const e of extras) add(e);
-  }
+  expandSynonymTerms(blob, add);
 
   return terms;
 }

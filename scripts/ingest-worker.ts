@@ -10,9 +10,9 @@ async function tick() {
     limit,
     workerId: `cli-${process.pid}`,
   });
-  if (result.processed.length || result.failed.length) {
+  if (result.processed.length || result.failed.length || result.reclaimed) {
     console.log(
-      `[ingest-worker] processed=${result.processed.length} failed=${result.failed.length}`,
+      `[ingest-worker] processed=${result.processed.length} failed=${result.failed.length} reclaimed=${result.reclaimed}`,
     );
   }
 }

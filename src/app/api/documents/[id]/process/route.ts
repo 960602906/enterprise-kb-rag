@@ -4,9 +4,11 @@ import { auth } from "@/lib/auth";
 import { AccessError, requireKbAccess, requireUserId } from "@/lib/auth/acl";
 import { db } from "@/lib/db";
 import { documents } from "@/lib/db/schema";
-import { deleteDocument, processDocument } from "@/lib/rag";
+import { deleteDocument, enqueueDocumentProcessing } from "@/lib/rag";
 
 type Ctx = { params: Promise<{ id: string }> };
+
+export const maxDuration = 60;
 
 export async function POST(_req: Request, ctx: Ctx) {
   try {
@@ -24,7 +26,9 @@ export async function POST(_req: Request, ctx: Ctx) {
     }
 
     await requireKbAccess(userId, doc.knowledgeBaseId, "manage");
-    await processDocument(id);
+    const { jobId, inline } = await enqueueDocumentProcessing(id, {
+      waitInline: true,
+    });
 
     const [updated] = await db
       .select()
@@ -32,7 +36,11 @@ export async function POST(_req: Request, ctx: Ctx) {
       .where(eq(documents.id, id))
       .limit(1);
 
-    return NextResponse.json({ item: updated });
+    return NextResponse.json({
+      item: updated,
+      jobId,
+      queued: !inline,
+    });
   } catch (err) {
     if (err instanceof AccessError) {
       return NextResponse.json({ error: err.message }, { status: err.status });

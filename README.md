@@ -77,6 +77,10 @@ Open [http://localhost:43123](http://localhost:43123).
 | `STORAGE_DRIVER` | `local` (default) or `s3` |
 | `SEED_*` | Seed admin/member credentials |
 | `DISABLE_REGISTER` | Block `/api/register` when `true` |
+| `CRON_SECRET` | Bearer token for Vercel Cron / drain (`INGEST_CRON_SECRET` alias) |
+| `INGEST_WORKER_INLINE` | `true` to process in-request (dev default); `false` in production |
+| `INGEST_BATCH_SIZE` | Docs per drain tick (default 3 on Cron, 10 on CLI worker) |
+| `INGEST_LOCK_TTL_MS` | Reclaim `running` jobs after this many ms (default 180000) |
 | `SEARCH_KNOWLEDGE_API_KEY` | Service SearchKnowledge header `x-api-key` |
 | `SEARCH_KNOWLEDGE_KB_IDS` | Comma-separated KB UUID allowlist for that key |
 | `SEARCH_KNOWLEDGE_DEFAULT_KB_NAME` | Used when the request omits ids and KB_IDS is unset (default `Internal Docs`) |
@@ -128,8 +132,38 @@ Without keys, set `MOCK_CHAT=true` and `MOCK_EMBEDDINGS=true` for deterministic 
 3. Set `AUTH_SECRET`, `AUTH_URL` (production URL), and model keys
 4. Run `pnpm db:migrate` against the remote DB
 5. Deploy the Next.js app; set `STORAGE_DRIVER=s3` for multi-instance uploads
+6. Production ingest (required — serverless has no long-lived `pnpm jobs:work`):
+   - `INGEST_WORKER_INLINE=false`
+   - `CRON_SECRET` (Vercel sends `Authorization: Bearer $CRON_SECRET`)
+   - `DISABLE_REGISTER=true`
+   - Keep [`vercel.json`](./vercel.json) cron: `GET /api/cron/ingest` every minute
 
 > Disk uploads work for MVP / single-node. On Vercel, use S3-compatible object storage.
+>
+> Vercel Hobby only allows one cron per day. Pro (or a box running `pnpm jobs:work`) is required for timely processing.
+
+### Production ingest checklist
+
+| Must set | Why |
+|----------|-----|
+| `STORAGE_DRIVER=s3` + bucket creds | Vercel filesystem is ephemeral |
+| `INGEST_WORKER_INLINE=false` | Do not embed inside the upload/process request |
+| `CRON_SECRET` | Protects `/api/cron/ingest` and `POST /api/ingest { "drain": true }` |
+| `DISABLE_REGISTER=true` | Block public sign-up |
+| `SEARCH_KNOWLEDGE_ALLOW_ALL=false` | No implicit all-KB service reads |
+
+Manual drain (same secret):
+
+```bash
+curl -sS -X POST https://<host>/api/ingest \
+  -H "authorization: Bearer $CRON_SECRET" \
+  -H "content-type: application/json" \
+  -d '{"drain":true,"limit":3}'
+```
+
+Self-hosted alternative: `INGEST_WORKER_INLINE=false` and run `pnpm jobs:work` (or `pnpm jobs:work:once` from system cron).
+
+Stale `running` jobs (serverless timeout / crashed worker) are re-queued after `INGEST_LOCK_TTL_MS` (default 3 minutes). Documents stuck in `processing` go back to `pending`.
 
 ## Architecture (dirs)
 
@@ -138,12 +172,13 @@ src/app/(auth)/login          Login / register
 src/app/(app)/knowledge-bases KB list, create, detail
 src/app/(app)/chat            Multi-KB RAG chat + citations
 src/app/api/                  REST + streaming chat + SearchKnowledge
+src/app/api/cron/ingest       Vercel Cron drain worker
 src/lib/auth                  Auth.js + ACL helpers
 src/lib/db                    Drizzle schema + client
 src/lib/i18n                  UI chrome strings (zh / en)
 src/lib/rag                   Parse, chunk, embed, retrieve, SearchKnowledge
 src/lib/storage               local / S3 object store
-src/lib/jobs                  ingest job queue
+src/lib/jobs                  ingest job queue + cron auth
 config/                       synonym bags + eval fixtures
 samples/                      Sample docs for testing
 ```
@@ -217,5 +252,3 @@ pnpm eval:retrieval
 
 - [ ] **SSO / OIDC** — Okta, Azure AD / Entra, Google Workspace; map groups → `kb_members` roles; set `DISABLE_REGISTER=true`
 - [ ] **Connectors** — Notion / 飞书 / Confluence sync into knowledge bases
-- [ ] **Upload locators** — persist `local:` / `s3://` keys from `getObjectStore()` instead of absolute disk paths
-- [ ] **Chat session ACL** — reject `sessionId` not owned by the current user; run `assertChunksPermitted` on citations

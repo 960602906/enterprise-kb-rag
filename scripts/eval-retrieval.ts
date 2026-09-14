@@ -19,6 +19,7 @@ async function main() {
   const { db } = await import("../src/lib/db");
   const { knowledgeBases } = await import("../src/lib/db/schema");
   const { hybridRetrieve } = await import("../src/lib/rag/retrieve");
+  const { getRetrievalConfig } = await import("../src/lib/rag/retrieval-config");
 
   const filePath =
     process.env.EVAL_QUERIES_PATH?.trim() ||
@@ -41,12 +42,13 @@ async function main() {
     );
   }
 
+  const cfg = getRetrievalConfig();
   let failed = 0;
   for (const testCase of spec.cases) {
     const hits = await hybridRetrieve({
       query: testCase.query,
       permittedKbIds: [kbId],
-      topK: 8,
+      topK: cfg.topK,
     });
     const blob = hits
       .map((h) => `${h.documentTitle}\n${h.content}`)

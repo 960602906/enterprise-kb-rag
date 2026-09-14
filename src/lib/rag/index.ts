@@ -22,6 +22,7 @@ export {
   type RetrievedChunk,
 } from "./retrieve";
 export { expandSynonymTerms, loadSynonymBags } from "./synonyms";
+export { getRetrievalConfig, type RetrievalConfig } from "./retrieval-config";
 export { assertChunksPermitted } from "./acl-chunks";
 export { processDocument, ensureUploadDir, getUploadRoot, objectKey } from "./ingest";
 export { enqueueDocumentProcessing, drainIngestQueue } from "@/lib/jobs/ingest-queue";

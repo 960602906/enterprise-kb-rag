@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { isDocType, type DocType } from "./chunk-config";
+import { getRetrievalConfig } from "./retrieval-config";
 import { hybridRetrieve, makeSnippet } from "./retrieve";
 import { resolveSearchKnowledgeBaseIds } from "./search-scope";
 
@@ -95,11 +96,12 @@ export async function searchKnowledge(
   if (permittedKbIds.length === 0) return { items: [] };
 
   const docTypes = input.docTypes?.filter(isDocType);
+  const cfg = getRetrievalConfig();
 
   const retrieved = await hybridRetrieve({
     query: input.query,
     permittedKbIds,
-    topK: input.topK ?? 8,
+    topK: input.topK ?? cfg.topK,
     docTypes: docTypes?.length ? docTypes : undefined,
   });
 

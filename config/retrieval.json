@@ -1,9 +1,12 @@
 {
-  "version": 1,
+  "version": 2,
   "topK": 8,
   "vectorWeight": 0.65,
   "keywordWeight": 0.35,
-  "minHybridScore": 0.08,
+  "minHybridScore": 0,
   "candidateMultiplier": 3,
-  "candidateMin": 24
+  "candidateMin": 24,
+  "fusion": "rrf",
+  "rrfK": 60,
+  "trgmMinSimilarity": 0.35
 }

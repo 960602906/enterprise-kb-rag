@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Public SSH tunnel host hits this Next.dev server; allow HMR/dev assets.
+  allowedDevOrigins: ["115.190.128.7"],
 };
 
 export default nextConfig;

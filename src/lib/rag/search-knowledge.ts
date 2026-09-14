@@ -1,13 +1,9 @@
 import { createHmac, timingSafeEqual } from "crypto";
-import { eq, inArray } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { knowledgeBases } from "@/lib/db/schema";
-import {
-  isDocType,
-  SKYROC_KNOWLEDGE_BASE_NAME,
-  type DocType,
-} from "./chunk-config";
+import { isDocType, type DocType } from "./chunk-config";
 import { hybridRetrieve, makeSnippet } from "./retrieve";
+import { resolveSearchKnowledgeBaseIds } from "./search-scope";
+
+export { resolveSearchKnowledgeBaseIds } from "./search-scope";
 
 export type SearchKnowledgeRequest = {
   query: string;
@@ -34,11 +30,6 @@ export type AuthResult =
   | { ok: true }
   | { ok: false; status: number; error: string };
 
-/**
- * Service-to-service auth for SearchKnowledge.
- * Requires `x-api-key` === SEARCH_KNOWLEDGE_API_KEY when the env is set.
- * If unset: production refuses; development allows localhost only (with a warning).
- */
 export function authorizeSearchKnowledge(req: Request): AuthResult {
   const expected = process.env.SEARCH_KNOWLEDGE_API_KEY?.trim() ?? "";
   const provided = req.headers.get("x-api-key")?.trim() ?? "";
@@ -93,54 +84,6 @@ function isLocalRequest(req: Request): boolean {
   }
   if (forwarded && !LOCAL_HOSTS.has(forwarded)) return false;
   return true;
-}
-
-function apiKeyKbAllowlist(): string[] | null {
-  const raw = process.env.SEARCH_KNOWLEDGE_KB_IDS?.trim();
-  if (!raw) return null;
-  const ids = raw.split(/[,\s]+/).filter(Boolean);
-  return ids.length ? ids : null;
-}
-
-/**
- * Resolve KBs the SearchKnowledge key may read.
- * Requested ids are intersected with the env allowlist (if set).
- * With no requested ids: dedicated "SkyRoc Docs" KB, else all KBs (MVP).
- */
-export async function resolveSearchKnowledgeBaseIds(
-  requested?: string[],
-): Promise<string[]> {
-  const allowlist = apiKeyKbAllowlist();
-
-  if (requested?.length) {
-    const unique = [...new Set(requested)];
-    const scoped = allowlist
-      ? unique.filter((id) => allowlist.includes(id))
-      : unique;
-    if (scoped.length === 0) return [];
-    const rows = await db
-      .select({ id: knowledgeBases.id })
-      .from(knowledgeBases)
-      .where(inArray(knowledgeBases.id, scoped));
-    return rows.map((r) => r.id);
-  }
-
-  if (allowlist?.length) {
-    const rows = await db
-      .select({ id: knowledgeBases.id })
-      .from(knowledgeBases)
-      .where(inArray(knowledgeBases.id, allowlist));
-    return rows.map((r) => r.id);
-  }
-
-  const named = await db
-    .select({ id: knowledgeBases.id })
-    .from(knowledgeBases)
-    .where(eq(knowledgeBases.name, SKYROC_KNOWLEDGE_BASE_NAME));
-  if (named.length > 0) return named.map((r) => r.id);
-
-  const all = await db.select({ id: knowledgeBases.id }).from(knowledgeBases);
-  return all.map((r) => r.id);
 }
 
 export async function searchKnowledge(

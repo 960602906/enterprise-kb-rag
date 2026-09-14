@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "knowledgeBaseName": "Employee Handbook",
+  "cases": [
+    {
+      "id": "pto-days",
+      "query": "How many PTO days?",
+      "expectAny": ["PTO", "day", "年假"]
+    },
+    {
+      "id": "sick-leave-zh",
+      "query": "病假有几天？",
+      "expectAny": ["病假", "天", "sick"]
+    }
+  ]
+}

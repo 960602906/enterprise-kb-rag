@@ -8,10 +8,13 @@
     "start": "next start --port 43123",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/migrate.ts",
+    "db:migrate": "tsx scripts/migrate.ts && tsx scripts/migrate-ingest-jobs.ts",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx scripts/seed.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "jobs:work": "tsx scripts/ingest-worker.ts",
+    "jobs:work:once": "tsx scripts/ingest-worker.ts --once",
+    "eval:retrieval": "tsx scripts/eval-retrieval.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.66",

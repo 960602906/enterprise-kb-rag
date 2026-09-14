@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "comment": "Example eval set for an ERP admin corpus. Point EVAL_QUERIES_PATH here after ingesting that corpus.",
+  "knowledgeBaseName": "Internal Docs",
+  "cases": [
+    {
+      "id": "after-sales-lookup",
+      "query": "售后怎么查",
+      "expectAny": ["售后", "列表", "查询"]
+    },
+    {
+      "id": "order-line-after-audit",
+      "query": "审核后怎么改销售明细",
+      "expectAny": ["明细", "审核", "订单"]
+    },
+    {
+      "id": "purchase-inbound-draft",
+      "query": "采购入库草稿怎么审",
+      "expectAny": ["采购入库", "草稿", "审核"]
+    }
+  ]
+}

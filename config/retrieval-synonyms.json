@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "bags": [
+    {
+      "id": "leave-pto",
+      "match": "PTO|paid time off|年假|病假|事假|休假|请假",
+      "terms": ["PTO", "leave", "vacation", "年假", "病假", "事假", "休假"]
+    },
+    {
+      "id": "handbook",
+      "match": "handbook|员工手册|制度|政策",
+      "terms": ["handbook", "policy", "员工手册", "制度"]
+    }
+  ]
+}

@@ -130,6 +130,29 @@ export default function OverviewPage() {
         </Card>
       </div>
 
+      {!loading && items.length === 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("overview.howToTitle")}</CardTitle>
+            <CardDescription>{t("overview.noKbs")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <ol className="list-none space-y-1.5 text-muted-foreground">
+              <li>{t("overview.step1")}</li>
+              <li>{t("overview.step2")}</li>
+              <li>{t("overview.step3")}</li>
+            </ol>
+            <p className="text-muted-foreground">{t("overview.inviteHint")}</p>
+            <Button asChild>
+              <Link href="/knowledge-bases/new">
+                <Plus data-icon="inline-start" />
+                {t("overview.createKb")}
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-7">
         <Card className="col-span-1 lg:col-span-4">
           <CardHeader className="flex flex-row items-start justify-between gap-2">
@@ -149,7 +172,7 @@ export default function OverviewPage() {
               </div>
             ) : items.length === 0 ? (
               <p className="py-8 text-sm text-muted-foreground">
-                {t("overview.noKbs")}
+                {t("kb.emptyBody")}
               </p>
             ) : (
               <ul className="divide-y">

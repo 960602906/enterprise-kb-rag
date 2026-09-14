@@ -20,7 +20,7 @@ export type RetrievedChunk = CitationPayload & {
 };
 
 /**
- * Hybrid retrieval: vector cosine + Postgres full-text (ts_rank).
+ * Hybrid retrieval: vector cosine + keyword (FTS for Latin, bigrams for CJK).
  *
  * CRITICAL: `permittedKbIds` must already be ACL-filtered.
  * Never retrieve-then-post-filter — WHERE constrains KB ids.
@@ -46,6 +46,13 @@ const CJK_STOP = new Set([
   "那个",
   "一个",
 ]);
+
+/** True when the query is mostly CJK — english tsvector will not help. */
+export function isCjkHeavyQuery(query: string): boolean {
+  const cjk = (query.match(/[\u3400-\u9fff]/g) ?? []).length;
+  const latin = (query.match(/[a-zA-Z]/g) ?? []).length;
+  return cjk >= 2 && cjk >= latin;
+}
 
 /**
  * Keyword terms for hybrid retrieval.
@@ -115,6 +122,13 @@ export async function hybridRetrieve(options: {
     cfg.candidateMin,
   );
   const docTypeClause = docTypeFilterSql(docTypes);
+  const cjkHeavy = isCjkHeavyQuery(query);
+  const ftsScore = cjkHeavy
+    ? sql`0`
+    : sql`COALESCE(ts_rank_cd(c.tsv, plainto_tsquery('english', ${query})), 0)`;
+  const ftsMatch = cjkHeavy
+    ? sql`false`
+    : sql`c.tsv @@ plainto_tsquery('english', ${query})`;
 
   const vectorRows = await db.execute<RetrievalRow>(sql`
     SELECT
@@ -153,7 +167,7 @@ export async function hybridRetrieve(options: {
       d.storage_path AS document_storage_path,
       c.metadata AS metadata,
       (
-        COALESCE(ts_rank_cd(c.tsv, plainto_tsquery('english', ${query})), 0)
+        ${ftsScore}
         + COALESCE((
             SELECT COUNT(*)::float
             FROM unnest(${termsLiteral}::text[]) AS t(term)
@@ -169,7 +183,7 @@ export async function hybridRetrieve(options: {
     WHERE c.knowledge_base_id = ANY(${kbArrayLiteral}::uuid[])
       AND d.status = 'ready'
       AND (
-        c.tsv @@ plainto_tsquery('english', ${query})
+        ${ftsMatch}
         OR (
           cardinality(${termsLiteral}::text[]) > 0
           AND EXISTS (

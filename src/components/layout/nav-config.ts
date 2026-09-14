@@ -2,6 +2,7 @@ import {
   BookOpen,
   LayoutDashboard,
   MessagesSquare,
+  ScrollText,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -39,6 +40,12 @@ export const navGroups: NavGroup[] = [
         titleKey: "nav.chat",
         url: "/chat",
         icon: MessagesSquare,
+        match: "prefix",
+      },
+      {
+        titleKey: "nav.logs",
+        url: "/qa-logs",
+        icon: ScrollText,
         match: "prefix",
       },
     ],

@@ -44,6 +44,9 @@ export function AppBreadcrumb() {
     if (pathname.startsWith("/chat")) {
       return [{ labelKey: "nav.chat" }];
     }
+    if (pathname.startsWith("/qa-logs")) {
+      return [{ labelKey: "nav.logs" }];
+    }
     if (pathname.startsWith("/settings")) {
       return [{ labelKey: "nav.settings" }];
     }

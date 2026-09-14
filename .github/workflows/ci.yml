@@ -19,3 +19,41 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
+      - run: pnpm eval:unit
+
+  retrieval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: kb_rag
+          POSTGRES_PASSWORD: kb_rag
+          POSTGRES_DB: kb_rag
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kb_rag -d kb_rag"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://kb_rag:kb_rag@localhost:5432/kb_rag
+      AUTH_SECRET: ci-eval-secret
+      MOCK_EMBEDDINGS: "true"
+      MOCK_CHAT: "true"
+      STORAGE_DRIVER: local
+      UPLOAD_DIR: /tmp/atlas-kb-ci-uploads
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      - run: pnpm db:seed
+      - run: pnpm eval:ingest-sample
+      - run: pnpm eval:retrieval

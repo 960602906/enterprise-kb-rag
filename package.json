@@ -16,7 +16,9 @@
     "db:studio": "drizzle-kit studio",
     "jobs:work": "tsx scripts/ingest-worker.ts",
     "jobs:work:once": "tsx scripts/ingest-worker.ts --once",
-    "eval:retrieval": "tsx scripts/eval-retrieval.ts"
+    "eval:retrieval": "tsx scripts/eval-retrieval.ts",
+    "eval:unit": "tsx scripts/eval-retrieve-unit.ts",
+    "eval:ingest-sample": "tsx scripts/eval-ingest-sample.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.66",

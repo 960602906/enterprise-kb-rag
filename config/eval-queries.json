@@ -1,16 +1,56 @@
 {
-  "version": 1,
+  "version": 2,
   "knowledgeBaseName": "Employee Handbook",
   "cases": [
     {
       "id": "pto-days",
       "query": "How many PTO days?",
-      "expectAny": ["PTO", "day", "年假"]
+      "expectAny": ["15 days", "15 天"]
+    },
+    {
+      "id": "pto-days-zh",
+      "query": "年假有几天？",
+      "expectAny": ["15 天", "15 days", "PTO"]
+    },
+    {
+      "id": "pto-accrual",
+      "query": "What is the PTO accrual rate per month?",
+      "expectAny": ["1.25"]
+    },
+    {
+      "id": "leave-request-lead-time",
+      "query": "How many business days before leave must I submit?",
+      "expectAny": ["5 business days", "5 个工作日"]
+    },
+    {
+      "id": "manager-approval-zh",
+      "query": "连续请假几天需要经理批准？",
+      "expectAny": ["3 天", "3+", "经理"]
+    },
+    {
+      "id": "blackout-year-end",
+      "query": "When is PTO not approved at fiscal year-end?",
+      "expectAny": ["March", "三月", "year-end"]
     },
     {
       "id": "sick-leave-zh",
       "query": "病假有几天？",
-      "expectAny": ["病假", "天", "sick"]
+      "expectAny": ["10 天", "10 sick"]
+    },
+    {
+      "id": "doctor-note",
+      "query": "When do I need a doctor's note for sick leave?",
+      "expectAny": ["3 consecutive", "连续缺勤超过", "医生"]
+    },
+    {
+      "id": "carry-over-cap",
+      "query": "How many unused PTO days can carry over?",
+      "expectAny": ["20 days", "20 天"]
+    },
+    {
+      "id": "hr-contact",
+      "query": "How do I contact HR about leave?",
+      "expectAny": ["hr@example.com", "#hr-help"]
     }
   ]
 }

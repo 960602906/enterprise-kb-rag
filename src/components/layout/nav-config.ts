@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  CircleHelp,
   LayoutDashboard,
   MessagesSquare,
   ScrollText,
@@ -53,6 +54,12 @@ export const navGroups: NavGroup[] = [
   {
     titleKey: "nav.other",
     items: [
+      {
+        titleKey: "overview.howToTitle",
+        url: "/help",
+        icon: CircleHelp,
+        match: "prefix",
+      },
       {
         titleKey: "nav.settings",
         url: "/settings",

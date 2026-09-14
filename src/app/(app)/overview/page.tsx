@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   BookOpen,
+  CircleHelp,
   Loader2,
   MessagesSquare,
   Plus,
@@ -72,6 +73,12 @@ export default function OverviewPage() {
   return (
     <div className="space-y-4">
       <PageHeader title={t("overview.title")} description={t("overview.subtitle")}>
+        <Button asChild variant="outline">
+          <Link href="/help">
+            <CircleHelp data-icon="inline-start" />
+            {t("overview.howToTitle")}
+          </Link>
+        </Button>
         <Button asChild>
           <Link href="/knowledge-bases/new">
             <Plus data-icon="inline-start" />
@@ -143,12 +150,17 @@ export default function OverviewPage() {
               <li>{t("overview.step3")}</li>
             </ol>
             <p className="text-muted-foreground">{t("overview.inviteHint")}</p>
-            <Button asChild>
-              <Link href="/knowledge-bases/new">
-                <Plus data-icon="inline-start" />
-                {t("overview.createKb")}
-              </Link>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild>
+                <Link href="/knowledge-bases/new">
+                  <Plus data-icon="inline-start" />
+                  {t("overview.createKb")}
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/help">{t("overview.howToTitle")}</Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : null}

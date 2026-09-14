@@ -47,6 +47,9 @@ export function AppBreadcrumb() {
     if (pathname.startsWith("/qa-logs")) {
       return [{ labelKey: "nav.logs" }];
     }
+    if (pathname.startsWith("/help")) {
+      return [{ labelKey: "overview.howToTitle" }];
+    }
     if (pathname.startsWith("/settings")) {
       return [{ labelKey: "nav.settings" }];
     }

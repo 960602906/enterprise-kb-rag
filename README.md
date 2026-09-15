@@ -214,26 +214,42 @@ Chat and ingest **filter permitted knowledge-base IDs before retrieval**. Never 
 
 Read-only retrieval API for other services (e.g. SkyRoc). Callers must treat returned snippets as **context only** — do not invent procedures, field values, ticket IDs, or database writes that are not in the snippets.
 
+### Multi-tenant guarantees
+
+| Guarantee | Behavior |
+|-----------|----------|
+| DB key ↔ KB bind | Reads are **only** the key’s bound `knowledgeBaseIds` (ACL before retrieve) |
+| Foreign `knowledgeBaseIds` | **403** if *any* requested id is outside the bind (including all-foreign). No silent drop. |
+| Unbound DB key | **403** — default-deny |
+| Disabled / unknown key | **401** |
+| `SEARCH_KNOWLEDGE_ALLOW_ALL` | **Never** applies to DB keys. Legacy env path only; in **production** also requires `SEARCH_KNOWLEDGE_ALLOW_ALL_IN_PRODUCTION=true` |
+| Admin key APIs | Session required; bind/list/update only for KBs the user can `manage` (manage on **all** bound KBs to see/edit a key) |
+| Cross-tenant list leak | Listing never returns other tenants’ keys or KB ids the user cannot manage |
+
 ### Auth (multi-key)
 
 Pass `x-api-key` on every request. Lookup order:
 
-1. **DB API key** (preferred) — create under **Settings → API keys**. Each key is hashed at rest (`SHA-256` of pepper + secret; pepper = `API_KEY_PEPPER` or `AUTH_SECRET`) and bound to one or more knowledge bases. A key can only read its bound KBs (`request knowledgeBaseIds ∩ key bindings`).
-2. **Legacy env key** — `SEARCH_KNOWLEDGE_API_KEY` still works so existing SkyRoc deploys keep working without a day-one migration. Scope uses `SEARCH_KNOWLEDGE_KB_IDS` / default KB name / `SEARCH_KNOWLEDGE_ALLOW_ALL` as before.
-3. If neither is configured: missing `x-api-key` returns **401**; development allows **localhost only** without a key and logs a warning.
+1. **DB API key** (preferred) — create under **Settings → API keys**. Each key is hashed at rest (`SHA-256` of pepper + secret; pepper = `API_KEY_PEPPER` or `AUTH_SECRET`) and bound to one or more knowledge bases.
+2. **Legacy env key** — `SEARCH_KNOWLEDGE_API_KEY` still works so existing SkyRoc deploys keep working without a day-one migration. Scope uses `SEARCH_KNOWLEDGE_KB_IDS` / default KB name / gated `ALLOW_ALL`.
+3. Missing `x-api-key` returns **401**; development allows **localhost only** without a key and logs a warning.
 
-`SEARCH_KNOWLEDGE_ALLOW_ALL` applies **only** to the legacy env path — never to DB-issued keys.
+Successful DB-key requests log `keyId` (never the secret) and update `last_used_at`.
 
 ### Resolve which KBs are searched
 
-**DB key:** `requested ∩ key.boundKbIds` (empty bindings → no results).
+**DB key:**
 
-**Legacy env key:**
+1. Zero bindings → **403**
+2. Request includes any unbound id → **403**
+3. Else search the requested ids (all must be bound), or all bound ids if omitted
+
+**Legacy env key** (SkyRoc-compatible; treat ALLOW_ALL as unsafe):
 
 1. Request `knowledgeBaseIds` ∩ `SEARCH_KNOWLEDGE_KB_IDS` (if the allowlist is set)
 2. Else the allowlist itself
 3. Else the KB named `SEARCH_KNOWLEDGE_DEFAULT_KB_NAME` (default `Internal Docs`)
-4. Else every KB **only if** `SEARCH_KNOWLEDGE_ALLOW_ALL=true`
+4. Else every KB **only if** `SEARCH_KNOWLEDGE_ALLOW_ALL=true` (and in production also `SEARCH_KNOWLEDGE_ALLOW_ALL_IN_PRODUCTION=true`)
 
 ### Call
 
@@ -258,7 +274,7 @@ curl -sS -X POST http://localhost:43123/api/search-knowledge \
 | `query` | Required |
 | `topK` | Optional, 1–50 (default 8) |
 | `docTypes` | Optional `flow` \| `rule` \| `faq`. Untagged chunks stay eligible |
-| `knowledgeBaseIds` | Optional; constrained by the authenticated key’s allowlist |
+| `knowledgeBaseIds` | Optional; DB keys: must all be bound or request 403s |
 
 Response: `{ "items": [{ "title", "snippet", "sourcePath", "score", "docType"? }] }`.
 
@@ -274,7 +290,7 @@ This route does **not** stream chat or call the LLM. Existing `/api/chat` RAG is
 | `DELETE` | `/api/api-keys/:id` | Revoke |
 | `POST` | `/api/api-keys/:id/rotate` | New secret; old one stops working |
 
-You may only bind knowledge bases you can `manage`. UI: `/settings/api-keys`.
+You may only bind knowledge bases you can `manage`. Listing requires manage on **every** KB bound to the key. UI: `/settings/api-keys`.
 
 ### Migrating SkyRoc off the env key
 
@@ -286,10 +302,6 @@ You may only bind knowledge bases you can `manage`. UI: `/settings/api-keys`.
 ### Chunking defaults
 
 See [`src/lib/rag/chunk-config.ts`](./src/lib/rag/chunk-config.ts):
-
-- Target window **400–800 tokens**, overlap **~100**
-- Prefer markdown headings; for `docType=flow`, also split on `步骤` / `Step N` / numbered steps
-- Chunk metadata: `docType`, `sourcePath`, `title` (inferred from path/filename or upload form fields `docType` / `sourcePath`)
 
 ## Sample document
 

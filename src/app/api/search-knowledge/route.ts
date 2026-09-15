@@ -57,7 +57,13 @@ export async function POST(req: Request) {
       );
     }
     const result = await searchKnowledge(parsed.data, authz.auth);
-    return NextResponse.json(result);
+    if (!result.ok) {
+      return NextResponse.json(
+        { error: result.error },
+        { status: result.status },
+      );
+    }
+    return NextResponse.json(result.response);
   } catch (err) {
     console.error("[search-knowledge]", err);
     return NextResponse.json({ error: "Search failed" }, { status: 500 });
@@ -99,7 +105,13 @@ export async function GET(req: Request) {
       );
     }
     const result = await searchKnowledge(parsed.data, authz.auth);
-    return NextResponse.json(result);
+    if (!result.ok) {
+      return NextResponse.json(
+        { error: result.error },
+        { status: result.status },
+      );
+    }
+    return NextResponse.json(result.response);
   } catch (err) {
     console.error("[search-knowledge]", err);
     return NextResponse.json({ error: "Search failed" }, { status: 500 });

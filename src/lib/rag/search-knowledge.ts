@@ -1,10 +1,13 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import type { SearchApiKeyAuth } from "@/lib/api-keys/service";
-import { findEnabledApiKeyBySecret } from "@/lib/api-keys/service";
+import { findApiKeyBySecret } from "@/lib/api-keys/service";
 import { isDocType, type DocType } from "./chunk-config";
 import { getRetrievalConfig } from "./retrieval-config";
 import { hybridRetrieve, makeSnippet } from "./retrieve";
-import { resolveSearchKnowledgeBaseIds } from "./search-scope";
+import {
+  evaluateDbKeyScope,
+  resolveSearchKnowledgeBaseIds,
+} from "./search-scope";
 
 export { resolveSearchKnowledgeBaseIds } from "./search-scope";
 
@@ -27,6 +30,10 @@ export type SearchKnowledgeResponse = {
   items: SearchKnowledgeItem[];
 };
 
+export type SearchKnowledgeResult =
+  | { ok: true; response: SearchKnowledgeResponse }
+  | { ok: false; status: number; error: string };
+
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
 export type AuthResult =
@@ -37,7 +44,7 @@ export type AuthResult =
  * Auth for `/api/search-knowledge`.
  *
  * Lookup order:
- * 1. Enabled DB API key (SHA-256 hash) → scoped to bound KBs
+ * 1. DB API key by hash → enabled + scoped to bound KBs; disabled → 401
  * 2. Legacy env `SEARCH_KNOWLEDGE_API_KEY` (+ env KB allowlist / ALLOW_ALL)
  * 3. Development localhost when no env key is configured
  */
@@ -48,8 +55,25 @@ export async function authorizeSearchKnowledge(
 
   if (provided) {
     try {
-      const dbAuth = await findEnabledApiKeyBySecret(provided);
-      if (dbAuth) return { ok: true, auth: dbAuth };
+      const dbKey = await findApiKeyBySecret(provided);
+      if (dbKey) {
+        if (!dbKey.enabled) {
+          return {
+            ok: false,
+            status: 401,
+            error: "Invalid or missing x-api-key",
+          };
+        }
+        return {
+          ok: true,
+          auth: {
+            kind: "db",
+            apiKeyId: dbKey.apiKeyId,
+            knowledgeBaseIds: dbKey.knowledgeBaseIds,
+            rateLimitPerMin: dbKey.rateLimitPerMin,
+          },
+        };
+      }
     } catch (err) {
       console.error("[search-knowledge] DB API key lookup failed", err);
     }
@@ -66,8 +90,7 @@ export async function authorizeSearchKnowledge(
     };
   }
 
-  // Missing header: never treat as "unconfigured" once DB keys are in use —
-  // always 401 except localhost-dev when the legacy env key is also unset.
+  // Missing header: 401 except localhost-dev when the legacy env key is unset.
   const expected = process.env.SEARCH_KNOWLEDGE_API_KEY?.trim() ?? "";
   if (expected) {
     return {
@@ -120,26 +143,45 @@ function isLocalRequest(req: Request): boolean {
   return true;
 }
 
+/**
+ * Search with ACL applied *before* retrieval (no retrieve-then-filter).
+ * DB keys: unbound or any foreign knowledgeBaseId → 403.
+ */
 export async function searchKnowledge(
   input: SearchKnowledgeRequest,
   auth: SearchApiKeyAuth,
-): Promise<SearchKnowledgeResponse> {
-  const scope =
-    auth.kind === "db"
-      ? {
-          allowlist: auth.knowledgeBaseIds,
-          legacyEnvScope: false,
-        }
-      : {
-          // legacy + localhost keep SEARCH_KNOWLEDGE_* behavior
-          legacyEnvScope: true,
-        };
+): Promise<SearchKnowledgeResult> {
+  let permittedKbIds: string[];
 
-  const permittedKbIds = await resolveSearchKnowledgeBaseIds(
-    input.knowledgeBaseIds,
-    scope,
-  );
-  if (permittedKbIds.length === 0) return { items: [] };
+  if (auth.kind === "db") {
+    const scope = evaluateDbKeyScope(
+      input.knowledgeBaseIds,
+      auth.knowledgeBaseIds,
+    );
+    if (!scope.ok) {
+      return { ok: false, status: scope.status, error: scope.error };
+    }
+    // Verify ids still exist; missing rows are dropped (not foreign — already checked).
+    permittedKbIds = await resolveSearchKnowledgeBaseIds(undefined, {
+      allowlist: scope.ids,
+      legacyEnvScope: false,
+    });
+    console.info(
+      `[search-knowledge] auth=db keyId=${auth.apiKeyId} requested=${input.knowledgeBaseIds?.length ?? 0} permitted=${permittedKbIds.length}`,
+    );
+  } else {
+    permittedKbIds = await resolveSearchKnowledgeBaseIds(
+      input.knowledgeBaseIds,
+      { legacyEnvScope: true },
+    );
+    console.info(
+      `[search-knowledge] auth=${auth.kind} permitted=${permittedKbIds.length}`,
+    );
+  }
+
+  if (permittedKbIds.length === 0) {
+    return { ok: true, response: { items: [] } };
+  }
 
   const docTypes = input.docTypes?.filter(isDocType);
   const cfg = getRetrievalConfig();
@@ -162,5 +204,5 @@ export async function searchKnowledge(
     return item;
   });
 
-  return { items };
+  return { ok: true, response: { items } };
 }

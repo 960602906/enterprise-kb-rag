@@ -43,10 +43,25 @@ export type SearchApiKeyAuth =
   | { kind: "legacy" }
   | { kind: "dev-localhost" };
 
-/** Look up an enabled DB API key by plaintext. Updates last_used_at on hit. */
-export async function findEnabledApiKeyBySecret(
+export type ApiKeyLookup =
+  | {
+      enabled: true;
+      apiKeyId: string;
+      knowledgeBaseIds: string[];
+      rateLimitPerMin: number | null;
+    }
+  | {
+      enabled: false;
+      apiKeyId: string;
+    };
+
+/**
+ * Look up a DB API key by plaintext (enabled or disabled).
+ * Updates last_used_at only when enabled. Returns null if hash unknown.
+ */
+export async function findApiKeyBySecret(
   plaintext: string,
-): Promise<SearchApiKeyAuth | null> {
+): Promise<ApiKeyLookup | null> {
   if (!plaintext) return null;
   const keyHash = hashApiKey(plaintext);
   const [row] = await db
@@ -59,7 +74,11 @@ export async function findEnabledApiKeyBySecret(
     .where(eq(apiKeys.keyHash, keyHash))
     .limit(1);
 
-  if (!row || !row.enabled) return null;
+  if (!row) return null;
+
+  if (!row.enabled) {
+    return { enabled: false, apiKeyId: row.id };
+  }
 
   const bindings = await db
     .select({ knowledgeBaseId: apiKeyKnowledgeBases.knowledgeBaseId })
@@ -76,10 +95,24 @@ export async function findEnabledApiKeyBySecret(
     });
 
   return {
-    kind: "db",
+    enabled: true,
     apiKeyId: row.id,
     knowledgeBaseIds: bindings.map((b) => b.knowledgeBaseId),
     rateLimitPerMin: row.rateLimitPerMin,
+  };
+}
+
+/** @deprecated Prefer findApiKeyBySecret — kept for clarity at call sites. */
+export async function findEnabledApiKeyBySecret(
+  plaintext: string,
+): Promise<SearchApiKeyAuth | null> {
+  const found = await findApiKeyBySecret(plaintext);
+  if (!found || !found.enabled) return null;
+  return {
+    kind: "db",
+    apiKeyId: found.apiKeyId,
+    knowledgeBaseIds: found.knowledgeBaseIds,
+    rateLimitPerMin: found.rateLimitPerMin,
   };
 }
 
@@ -142,13 +175,15 @@ function toListItem(
 }
 
 /**
- * List keys the user can see: created by them, or bound to a KB they manage.
+ * List keys the user may administer: manage on *every* bound KB.
+ * Unbound keys are visible only to the creator (cleanup).
+ * Never returns KB ids the user cannot manage.
  */
 export async function listApiKeysForUser(
   userId: string,
 ): Promise<ApiKeyListItem[]> {
   const manageable = await listManageableKnowledgeBases(userId);
-  const manageableIds = manageable.map((k) => k.id);
+  const manageableIds = new Set(manageable.map((k) => k.id));
 
   const created = await db
     .select()
@@ -156,11 +191,13 @@ export async function listApiKeysForUser(
     .where(eq(apiKeys.createdBy, userId));
 
   let viaKb: (typeof apiKeys.$inferSelect)[] = [];
-  if (manageableIds.length > 0) {
+  if (manageableIds.size > 0) {
     const linked = await db
       .select({ apiKeyId: apiKeyKnowledgeBases.apiKeyId })
       .from(apiKeyKnowledgeBases)
-      .where(inArray(apiKeyKnowledgeBases.knowledgeBaseId, manageableIds));
+      .where(
+        inArray(apiKeyKnowledgeBases.knowledgeBaseId, [...manageableIds]),
+      );
     const linkedIds = [...new Set(linked.map((r) => r.apiKeyId))];
     if (linkedIds.length > 0) {
       viaKb = await db
@@ -176,12 +213,16 @@ export async function listApiKeysForUser(
   const items: ApiKeyListItem[] = [];
   for (const row of byId.values()) {
     const kbs = await loadKeyKnowledgeBases(row.id);
-    const isCreator = row.createdBy === userId;
-    const manageableBound = kbs.filter((kb) => manageableIds.includes(kb.id));
-    const canSee = isCreator || manageableBound.length > 0;
-    if (!canSee) continue;
-    // Non-creators only see KB bindings they can manage (no cross-tenant leak).
-    items.push(toListItem(row, isCreator ? kbs : manageableBound));
+
+    if (kbs.length === 0) {
+      // Unbound: creator-only cleanup visibility.
+      if (row.createdBy === userId) items.push(toListItem(row, []));
+      continue;
+    }
+
+    // Tenant isolation: require manage on all bound KBs; do not leak others.
+    if (!kbs.every((kb) => manageableIds.has(kb.id))) continue;
+    items.push(toListItem(row, kbs));
   }
 
   items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());

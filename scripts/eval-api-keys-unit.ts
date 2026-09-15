@@ -1,5 +1,5 @@
 /**
- * API key crypto + scope unit checks (no Postgres).
+ * API key crypto + multi-tenant scope unit checks (no Postgres).
  *   pnpm eval:api-keys
  */
 import {
@@ -8,6 +8,10 @@ import {
   generateApiKeyPlaintext,
   hashApiKey,
 } from "../src/lib/api-keys/crypto";
+import {
+  allowAllKnowledgeBases,
+  evaluateDbKeyScope,
+} from "../src/lib/rag/search-scope";
 
 let failed = 0;
 
@@ -39,41 +43,86 @@ check(
 );
 check("display-not-full", prefix !== a && !a.endsWith(prefix.slice(4)));
 
-/** Pure scope intersection — mirrors DB-key path in resolveSearchKnowledgeBaseIds. */
-function intersectScope(
-  requested: string[] | undefined,
-  allowlist: string[],
-): string[] {
-  if (allowlist.length === 0) return [];
-  if (requested?.length) {
-    const unique = [...new Set(requested)];
-    return unique.filter((id) => allowlist.includes(id));
-  }
-  return [...allowlist];
-}
-
 const kbA = "11111111-1111-1111-1111-111111111111";
 const kbB = "22222222-2222-2222-2222-222222222222";
 const kbC = "33333333-3333-3333-3333-333333333333";
 
+const unbound = evaluateDbKeyScope([kbA], []);
 check(
-  "scope-empty-bind",
-  intersectScope([kbA], []).length === 0,
-  "unbound key must not read any KB",
+  "scope-unbound-403",
+  !unbound.ok && unbound.status === 403,
+  "zero bindings must 403",
 );
+
+const foreign = evaluateDbKeyScope([kbC], [kbA, kbB]);
 check(
-  "scope-foreign-kb",
-  intersectScope([kbC], [kbA, kbB]).length === 0,
-  "foreign KB id must be filtered out",
+  "scope-all-foreign-403",
+  !foreign.ok && foreign.status === 403,
+  "all-foreign request must 403",
 );
+
+const mixed = evaluateDbKeyScope([kbA, kbC], [kbA, kbB]);
 check(
-  "scope-intersection",
-  intersectScope([kbA, kbC], [kbA, kbB]).join(",") === kbA,
+  "scope-mixed-foreign-403",
+  !mixed.ok && mixed.status === 403,
+  "any foreign id must 403 (no silent drop)",
 );
+
+const okScope = evaluateDbKeyScope([kbA], [kbA, kbB]);
+check(
+  "scope-permitted-ok",
+  okScope.ok && okScope.ids.join(",") === kbA,
+);
+
+const defaultBound = evaluateDbKeyScope(undefined, [kbA, kbB]);
 check(
   "scope-default-bound",
-  intersectScope(undefined, [kbA, kbB]).sort().join(",") ===
-    [kbA, kbB].sort().join(","),
+  defaultBound.ok &&
+    defaultBound.ids.sort().join(",") === [kbA, kbB].sort().join(","),
+);
+
+// ALLOW_ALL must not apply to DB keys (evaluateDbKeyScope never expands).
+check(
+  "db-key-never-allow-all",
+  evaluateDbKeyScope(undefined, [kbA]).ok === true &&
+    (evaluateDbKeyScope(undefined, [kbA]) as { ids: string[] }).ids.length ===
+      1,
+);
+
+check(
+  "allow-all-blocked-in-prod",
+  allowAllKnowledgeBases({
+    SEARCH_KNOWLEDGE_ALLOW_ALL: "true",
+    NODE_ENV: "production",
+  }) === false,
+  "prod refuses ALLOW_ALL without override",
+);
+
+check(
+  "allow-all-force-in-prod",
+  allowAllKnowledgeBases({
+    SEARCH_KNOWLEDGE_ALLOW_ALL: "true",
+    NODE_ENV: "production",
+    SEARCH_KNOWLEDGE_ALLOW_ALL_IN_PRODUCTION: "true",
+  }) === true,
+  "explicit override still works for legacy path",
+);
+
+check(
+  "allow-all-dev-ok",
+  allowAllKnowledgeBases({
+    SEARCH_KNOWLEDGE_ALLOW_ALL: "true",
+    NODE_ENV: "development",
+  }) === true,
+  "dev still allows ALLOW_ALL for legacy path",
+);
+
+check(
+  "allow-all-off",
+  allowAllKnowledgeBases({
+    SEARCH_KNOWLEDGE_ALLOW_ALL: "false",
+    NODE_ENV: "development",
+  }) === false,
 );
 
 if (failed > 0) {

@@ -144,7 +144,7 @@ export const en = {
     signedInAs: "Signed in as",
     apiKeys: "API keys",
     apiKeysBody:
-      "Issue SearchKnowledge keys for external services. Each key is scoped to knowledge bases you can manage.",
+      "Issue SearchKnowledge keys for external services. Each key is scoped to knowledge bases you can manage. Open the page for a beginner how-to demo.",
     apiKeysLink: "Manage API keys",
   },
   apiKeys: {
@@ -204,6 +204,39 @@ export const en = {
       "A new secret will be issued. The old secret stops working immediately.",
     confirmRotateAction: "Rotate key",
     selectKb: "Select at least one knowledge base",
+    guide: {
+      title: "How to use",
+      subtitle:
+        "Beginner demo: let an external AI search your knowledge with this key — no Atlas login needed.",
+      step1:
+        "What it does — The external system does not log into Atlas. It calls search with your key and gets short text snippets back.",
+      step2:
+        "Endpoint — Prefer POST /api/search-knowledge. GET with the same fields as a query string also works.",
+      step3:
+        "Headers — Send Content-Type: application/json and x-api-key: <your secret>.",
+      step4:
+        "Body — Minimal JSON: { \"query\": \"…\", \"topK\": 5 }. Omit knowledgeBaseIds to search all KBs bound to this key. Asking for a KB this key is not bound to returns 403.",
+      step5:
+        "Response — Use items[].snippet (and title when present) as context only.",
+      responseExample:
+        "{\n  \"items\": [\n    { \"title\": \"Handbook\", \"snippet\": \"…\" }\n  ]\n}",
+      step6Title: "curl example",
+      step6Note:
+        "{BASE} is your site origin (for example https://your-domain.com). Use a relative path from that origin — never hard-code a public IP.",
+      curlExample:
+        "curl -sS -X POST \"{BASE}/api/search-knowledge\" \\\n  -H \"Content-Type: application/json\" \\\n  -H \"x-api-key: <secret>\" \\\n  -d '{\"query\":\"How many PTO days?\",\"topK\":5}'",
+      copyCurl: "Copy curl",
+      step7Title: "Common errors",
+      error401: "401 — Missing, wrong, disabled, or revoked key.",
+      error403:
+        "403 — This key cannot access one of the knowledgeBaseIds you asked for (or the key has no bindings).",
+      errorEmpty:
+        "Empty items — Query ran, but no ready documents matched. Upload docs, click Process, wait until ready.",
+      step8Title: "Share with a partner",
+      partnerBlurb:
+        "Call Atlas SearchKnowledge at {BASE}/api/search-knowledge with header x-api-key and JSON { \"query\", \"topK\" }; read items[].snippet from the response.",
+      copyBlurb: "Copy blurb",
+    },
   },
   roles: {
     read: "read",
@@ -458,7 +491,7 @@ export const zh: Dictionary = {
     signedInAs: "当前登录",
     apiKeys: "API 密钥",
     apiKeysBody:
-      "为外部服务签发 SearchKnowledge 密钥。每个密钥只能访问你有管理权限的知识库。",
+      "为外部服务签发 SearchKnowledge 密钥。每个密钥只能访问你有管理权限的知识库。打开页面可看新手使用示范。",
     apiKeysLink: "管理 API 密钥",
   },
   apiKeys: {
@@ -511,6 +544,39 @@ export const zh: Dictionary = {
     confirmRotate: "将签发新密钥，旧密钥立即失效。",
     confirmRotateAction: "轮换密钥",
     selectKb: "请至少选择一个知识库",
+    guide: {
+      title: "使用示范",
+      subtitle:
+        "给新手看的短示范：外部 AI 用这把密钥检索你的知识库，无需登录 Atlas。",
+      step1:
+        "它做什么 — 外部系统不用登录 Atlas。它带着你的密钥调用检索接口，拿回短文本片段。",
+      step2:
+        "接口 — 推荐 POST /api/search-knowledge。也可用 GET，把同样字段放在查询字符串里。",
+      step3:
+        "请求头 — 发送 Content-Type: application/json，以及 x-api-key: <你的密钥>。",
+      step4:
+        "请求体 — 最小 JSON：{ \"query\": \"…\", \"topK\": 5 }。不写 knowledgeBaseIds 时，会检索该密钥绑定的全部知识库；请求未绑定的库会返回 403。",
+      step5:
+        "响应 — 主要用 items[].snippet（有 title 时也可看标题），仅作上下文。",
+      responseExample:
+        "{\n  \"items\": [\n    { \"title\": \"员工手册\", \"snippet\": \"…\" }\n  ]\n}",
+      step6Title: "curl 示例",
+      step6Note:
+        "{BASE} 是你的站点根地址（例如 https://your-domain.com）。请用该站点下的相对路径，不要写死公网 IP。",
+      curlExample:
+        "curl -sS -X POST \"{BASE}/api/search-knowledge\" \\\n  -H \"Content-Type: application/json\" \\\n  -H \"x-api-key: <secret>\" \\\n  -d '{\"query\":\"年假有多少天？\",\"topK\":5}'",
+      copyCurl: "复制 curl",
+      step7Title: "常见错误",
+      error401: "401 — 密钥缺失、错误、已禁用或已吊销。",
+      error403:
+        "403 — 请求的 knowledgeBaseIds 中有该密钥未绑定的库（或密钥本身没有任何绑定）。",
+      errorEmpty:
+        "items 为空 — 请求成功，但没有就绪文档匹配。请先上传文档、点「处理」，等状态变为就绪。",
+      step8Title: "发给对接方的一句话",
+      partnerBlurb:
+        "请调用 Atlas SearchKnowledge：{BASE}/api/search-knowledge，请求头带 x-api-key，JSON 体为 { \"query\", \"topK\" }；从响应的 items[].snippet 取片段。",
+      copyBlurb: "复制说明",
+    },
   },
   roles: {
     read: "只读",

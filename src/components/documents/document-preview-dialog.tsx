@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, Eye, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -20,15 +20,24 @@ type Props = {
   documentId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onLoadingChange?: (loading: boolean) => void;
 };
 
 export function DocumentPreviewDialog({
   documentId,
   open,
   onOpenChange,
+  onLoadingChange,
 }: Props) {
   const { t } = useI18n();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
   const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    onLoadingChange?.(loading);
+  }, [loading, onLoadingChange]);
   const [preview, setPreview] = useState<DocumentPreviewPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,7 +60,11 @@ export function DocumentPreviewDialog({
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           throw new Error(
-            translateApiError(t, data.error, "docs.previewFailed"),
+            translateApiError(
+              tRef.current,
+              data.error,
+              "docs.previewFailed",
+            ),
           );
         }
         if (!cancelled) {
@@ -60,7 +73,9 @@ export function DocumentPreviewDialog({
       } catch (err) {
         if (!cancelled) {
           const message =
-            err instanceof Error ? err.message : t("docs.previewFailed");
+            err instanceof Error
+              ? err.message
+              : tRef.current("docs.previewFailed");
           setError(message);
           toast.error(message);
         }
@@ -72,7 +87,7 @@ export function DocumentPreviewDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, documentId, t]);
+  }, [open, documentId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -89,11 +104,14 @@ export function DocumentPreviewDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
+        <div
+          className="min-h-0 flex-1 overflow-auto px-6 py-4"
+          aria-busy={loading}
+        >
           {loading ? (
-            <div className="flex min-h-[280px] items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              {t("docs.previewLoading")}
+            <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+              <Loader2 className="size-5 animate-spin" />
+              <span>{t("docs.previewLoading")}</span>
             </div>
           ) : error ? (
             <div className="flex min-h-[200px] items-center justify-center text-sm text-destructive">
@@ -115,7 +133,12 @@ export function DocumentPreviewDialog({
               </Button>
             ) : null}
           </div>
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+          >
             {t("common.close")}
           </Button>
         </DialogFooter>
@@ -178,7 +201,7 @@ export function DocumentPreviewTrigger({
   label: string;
 }) {
   return (
-    <Button size="sm" variant="outline" onClick={onClick}>
+    <Button type="button" size="sm" variant="outline" onClick={onClick}>
       <Eye data-icon="inline-start" />
       {label}
     </Button>

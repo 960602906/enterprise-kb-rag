@@ -8,6 +8,10 @@
 export const en = {
   common: {
     close: "Close",
+    cancel: "Cancel",
+    confirm: "Confirm",
+    delete: "Delete",
+    remove: "Remove",
   },
   lang: {
     label: "Language",
@@ -102,6 +106,8 @@ export const en = {
     deleteKb: "Delete KB",
     deleted: "Knowledge base deleted",
     confirmDelete: "Delete this knowledge base and all documents?",
+    confirmDeleteTitle: "Delete knowledge base?",
+    confirmDeleteAction: "Delete knowledge base",
     notFound: "Not found",
     loadingDetail: "Loading knowledge base…",
     detail: "Details",
@@ -161,6 +167,8 @@ export const en = {
     deleted: "Deleted",
     deleteFailed: "Delete failed",
     confirmDelete: "Delete this document?",
+    confirmDeleteTitle: "Delete document?",
+    confirmDeleteAction: "Delete document",
     preview: "Preview",
     previewSubtitle: "Original file contents",
     previewLoading: "Loading preview…",
@@ -190,6 +198,8 @@ export const en = {
     removed: "Removed",
     removeFailed: "Remove failed",
     confirmRemove: "Remove this member?",
+    confirmRemoveTitle: "Remove member?",
+    confirmRemoveAction: "Remove member",
   },
   chat: {
     title: "Chat",
@@ -251,6 +261,10 @@ export type Dictionary = DeepStringify<typeof en>;
 export const zh: Dictionary = {
   common: {
     close: "关闭",
+    cancel: "取消",
+    confirm: "确认",
+    delete: "删除",
+    remove: "移除",
   },
   lang: {
     label: "语言",
@@ -343,6 +357,8 @@ export const zh: Dictionary = {
     deleteKb: "删除知识库",
     deleted: "知识库已删除",
     confirmDelete: "确定删除该知识库及全部文档？",
+    confirmDeleteTitle: "删除知识库？",
+    confirmDeleteAction: "删除知识库",
     notFound: "未找到",
     loadingDetail: "正在加载知识库…",
     detail: "详情",
@@ -402,6 +418,8 @@ export const zh: Dictionary = {
     deleted: "已删除",
     deleteFailed: "删除失败",
     confirmDelete: "确定删除该文档？",
+    confirmDeleteTitle: "删除文档？",
+    confirmDeleteAction: "删除文档",
     preview: "预览",
     previewSubtitle: "原始文件内容",
     previewLoading: "正在加载预览…",
@@ -430,6 +448,8 @@ export const zh: Dictionary = {
     removed: "已移除",
     removeFailed: "移除失败",
     confirmRemove: "确定移除该成员？",
+    confirmRemoveTitle: "移除成员？",
+    confirmRemoveAction: "移除成员",
   },
   chat: {
     title: "问答",

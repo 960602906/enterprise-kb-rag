@@ -243,8 +243,8 @@ export default function KnowledgeBaseDetailPage() {
     }
   }
 
-  async function deleteDoc(docId: string) {
-    if (!canManage) return;
+  async function deleteDoc(docId: string): Promise<boolean> {
+    if (!canManage) return false;
     try {
       const res = await fetch(`/api/documents/${docId}/process`, {
         method: "DELETE",
@@ -252,13 +252,15 @@ export default function KnowledgeBaseDetailPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         toast.error(translateApiError(t, data.error, "docs.deleteFailed"));
-        return;
+        return false;
       }
       toast.success(t("docs.deleted"));
       if (previewDocId === docId) setPreviewDocId(null);
       await load({ silent: true });
+      return true;
     } catch {
       toast.error(t("docs.deleteFailed"));
+      return false;
     }
   }
 
@@ -290,8 +292,8 @@ export default function KnowledgeBaseDetailPage() {
     }
   }
 
-  async function removeMember(userId: string) {
-    if (!canManage) return;
+  async function removeMember(userId: string): Promise<boolean> {
+    if (!canManage) return false;
     try {
       const res = await fetch(`/api/knowledge-bases/${id}/members`, {
         method: "DELETE",
@@ -301,17 +303,19 @@ export default function KnowledgeBaseDetailPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         toast.error(translateApiError(t, data.error, "members.removeFailed"));
-        return;
+        return false;
       }
       toast.success(t("members.removed"));
       await load({ silent: true });
+      return true;
     } catch {
       toast.error(t("members.removeFailed"));
+      return false;
     }
   }
 
-  async function deleteKb() {
-    if (!canManage) return;
+  async function deleteKb(): Promise<boolean> {
+    if (!canManage) return false;
     setDeleting(true);
     try {
       const res = await fetch(`/api/knowledge-bases/${id}`, {
@@ -320,12 +324,14 @@ export default function KnowledgeBaseDetailPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         toast.error(translateApiError(t, data.error, "docs.deleteFailed"));
-        return;
+        return false;
       }
       toast.success(t("kb.deleted"));
       router.push("/knowledge-bases");
+      return true;
     } catch {
       toast.error(t("docs.deleteFailed"));
+      return false;
     } finally {
       setDeleting(false);
     }
@@ -335,14 +341,15 @@ export default function KnowledgeBaseDetailPage() {
     if (!confirmDialog || confirmBusy) return;
     setConfirmBusy(true);
     try {
+      let ok = false;
       if (confirmDialog.type === "delete-doc") {
-        await deleteDoc(confirmDialog.docId);
+        ok = await deleteDoc(confirmDialog.docId);
       } else if (confirmDialog.type === "remove-member") {
-        await removeMember(confirmDialog.userId);
+        ok = await removeMember(confirmDialog.userId);
       } else if (confirmDialog.type === "delete-kb") {
-        await deleteKb();
+        ok = await deleteKb();
       }
-      setConfirmDialog(null);
+      if (ok) setConfirmDialog(null);
     } finally {
       setConfirmBusy(false);
     }

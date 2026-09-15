@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeft,
+  BookOpen,
   Copy,
   KeyRound,
   Loader2,
@@ -221,6 +222,24 @@ export default function ApiKeysSettingsPage() {
     }
   }
 
+  async function copyPartnerBlurb() {
+    try {
+      await navigator.clipboard.writeText(t("apiKeys.guide.partnerBlurb"));
+      toast.success(t("apiKeys.copied"));
+    } catch {
+      toast.error(t("apiKeys.copy"));
+    }
+  }
+
+  async function copyCurlExample() {
+    try {
+      await navigator.clipboard.writeText(t("apiKeys.guide.curlExample"));
+      toast.success(t("apiKeys.copied"));
+    } catch {
+      toast.error(t("apiKeys.copy"));
+    }
+  }
+
   const confirmCopy =
     confirmDialog?.type === "revoke"
       ? {
@@ -326,6 +345,85 @@ export default function ApiKeysSettingsPage() {
         </div>
       </PageHeader>
       <Separator className="my-2" />
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BookOpen className="size-5" />
+            {t("apiKeys.guide.title")}
+          </CardTitle>
+          <CardDescription>{t("apiKeys.guide.subtitle")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          <ol className="list-decimal space-y-2 pl-5 text-muted-foreground marker:text-foreground">
+            <li>
+              <span className="text-foreground">{t("apiKeys.guide.step1")}</span>
+            </li>
+            <li>
+              <span className="text-foreground">{t("apiKeys.guide.step2")}</span>
+            </li>
+            <li>
+              <span className="text-foreground">{t("apiKeys.guide.step3")}</span>
+            </li>
+            <li>
+              <span className="text-foreground">{t("apiKeys.guide.step4")}</span>
+            </li>
+            <li>
+              <span className="text-foreground">{t("apiKeys.guide.step5")}</span>
+            </li>
+          </ol>
+
+          <pre className="overflow-x-auto whitespace-pre-wrap rounded-md bg-muted px-3 py-2 font-mono text-xs leading-relaxed">
+            {t("apiKeys.guide.responseExample")}
+          </pre>
+
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium">{t("apiKeys.guide.step6Title")}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void copyCurlExample()}
+              >
+                <Copy data-icon="inline-start" />
+                {t("apiKeys.guide.copyCurl")}
+              </Button>
+            </div>
+            <p className="text-muted-foreground">{t("apiKeys.guide.step6Note")}</p>
+            <pre className="overflow-x-auto whitespace-pre-wrap rounded-md bg-muted px-3 py-2 font-mono text-xs leading-relaxed">
+              {t("apiKeys.guide.curlExample")}
+            </pre>
+          </div>
+
+          <div className="space-y-2">
+            <p className="font-medium">{t("apiKeys.guide.step7Title")}</p>
+            <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+              <li>{t("apiKeys.guide.error401")}</li>
+              <li>{t("apiKeys.guide.error403")}</li>
+              <li>{t("apiKeys.guide.errorEmpty")}</li>
+            </ul>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium">{t("apiKeys.guide.step8Title")}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void copyPartnerBlurb()}
+              >
+                <Copy data-icon="inline-start" />
+                {t("apiKeys.guide.copyBlurb")}
+              </Button>
+            </div>
+            <p className="rounded-md border bg-muted/40 px-3 py-2 text-muted-foreground">
+              {t("apiKeys.guide.partnerBlurb")}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

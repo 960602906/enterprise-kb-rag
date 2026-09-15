@@ -230,7 +230,7 @@ Read-only retrieval API for other services (e.g. SkyRoc). Callers must treat ret
 
 Pass `x-api-key` on every request. Lookup order:
 
-1. **DB API key** (preferred) — create under **Settings → API keys**. Each key is hashed at rest (`SHA-256` of pepper + secret; pepper = `API_KEY_PEPPER` or `AUTH_SECRET`) and bound to one or more knowledge bases.
+1. **DB API key** (preferred) — create under **Settings → API keys** (the page includes a beginner **How to use** / **使用示范** guide with relative `{BASE}/api/search-knowledge` examples). Each key is hashed at rest (`SHA-256` of pepper + secret; pepper = `API_KEY_PEPPER` or `AUTH_SECRET`) and bound to one or more knowledge bases.
 2. **Legacy env key** — `SEARCH_KNOWLEDGE_API_KEY` still works so existing SkyRoc deploys keep working without a day-one migration. Scope uses `SEARCH_KNOWLEDGE_KB_IDS` / default KB name / gated `ALLOW_ALL`.
 3. Missing `x-api-key` returns **401**; development allows **localhost only** without a key and logs a warning.
 

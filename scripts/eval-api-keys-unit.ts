@@ -11,7 +11,7 @@ import {
 import {
   allowAllKnowledgeBases,
   evaluateDbKeyScope,
-} from "../src/lib/rag/search-scope";
+} from "../src/lib/rag/search-scope-pure";
 
 let failed = 0;
 

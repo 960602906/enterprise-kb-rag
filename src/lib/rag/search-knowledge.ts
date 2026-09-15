@@ -10,6 +10,7 @@ import {
 } from "./search-scope";
 
 export { resolveSearchKnowledgeBaseIds } from "./search-scope";
+export { evaluateDbKeyScope } from "./search-scope-pure";
 
 export type SearchKnowledgeRequest = {
   query: string;

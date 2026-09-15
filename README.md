@@ -303,6 +303,10 @@ You may only bind knowledge bases you can `manage`. Listing requires manage on *
 
 See [`src/lib/rag/chunk-config.ts`](./src/lib/rag/chunk-config.ts):
 
+- Target window **400–800 tokens**, overlap **~100**
+- Prefer markdown headings; for `docType=flow`, also split on `步骤` / `Step N` / numbered steps
+- Chunk metadata: `docType`, `sourcePath`, `title` (inferred from path/filename or upload form fields `docType` / `sourcePath`)
+
 ## Sample document
 
 Upload [`samples/employee-handbook.md`](./samples/employee-handbook.md) (bilingual PTO policy), click **Process**, then ask in Chat e.g. “How many PTO days?” / “病假有几天？”

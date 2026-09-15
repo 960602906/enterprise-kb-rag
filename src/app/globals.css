@@ -226,3 +226,58 @@
     opacity: 1;
   }
 }
+
+/* In-app document preview (markdown / mammoth HTML) */
+.doc-preview-html :is(h1, h2, h3, h4, h5, h6) {
+  margin-top: 1.1em;
+  margin-bottom: 0.4em;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+.doc-preview-html h1 {
+  font-size: 1.35rem;
+}
+.doc-preview-html h2 {
+  font-size: 1.2rem;
+}
+.doc-preview-html h3 {
+  font-size: 1.05rem;
+}
+.doc-preview-html p {
+  margin: 0.65em 0;
+}
+.doc-preview-html ul {
+  margin: 0.65em 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+.doc-preview-html li {
+  margin: 0.2em 0;
+}
+.doc-preview-html a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.doc-preview-html :is(code, .doc-preview-pre code) {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.85em;
+}
+.doc-preview-html code {
+  border-radius: 0.3rem;
+  background: color-mix(in oklab, var(--muted) 80%, transparent);
+  padding: 0.1em 0.35em;
+}
+.doc-preview-html .doc-preview-pre {
+  overflow-x: auto;
+  margin: 0.85em 0;
+  border-radius: 0.6rem;
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  background: color-mix(in oklab, var(--muted) 55%, transparent);
+  padding: 0.75rem 0.9rem;
+}
+.doc-preview-html img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}

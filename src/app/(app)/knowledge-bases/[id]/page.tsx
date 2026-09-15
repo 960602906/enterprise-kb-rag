@@ -40,6 +40,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DocumentPreviewDialog,
 } from "@/components/documents/document-preview-dialog";
 import { prefersDownloadAction } from "@/lib/documents/preview";
@@ -120,11 +130,21 @@ export default function KnowledgeBaseDetailPage() {
   const [addingMember, setAddingMember] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [previewDocId, setPreviewDocId] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<
+    | { type: "delete-doc"; docId: string }
+    | { type: "remove-member"; userId: string }
+    | { type: "delete-kb" }
+    | null
+  >(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const canManage = kb?.role === "manage";
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const [kbRes, membersRes] = await Promise.all([
@@ -151,7 +171,9 @@ export default function KnowledgeBaseDetailPage() {
           : tRef.current("errors.loadFailed"),
       );
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [id]);
 
@@ -165,7 +187,7 @@ export default function KnowledgeBaseDetailPage() {
     );
     if (!busy) return;
     const t = setInterval(() => {
-      void load();
+      void load({ silent: true });
     }, 4000);
     return () => clearInterval(t);
   }, [documents, load]);
@@ -192,7 +214,7 @@ export default function KnowledgeBaseDetailPage() {
       toast.success(t("docs.uploaded"));
       setFile(null);
       setTitle("");
-      await load();
+      await load({ silent: true });
     } catch {
       toast.error(t("docs.uploadFailed"));
     } finally {
@@ -213,7 +235,7 @@ export default function KnowledgeBaseDetailPage() {
         return;
       }
       toast.success(t("docs.processed"));
-      await load();
+      await load({ silent: true });
     } catch {
       toast.error(t("docs.processFailed"));
     } finally {
@@ -223,7 +245,6 @@ export default function KnowledgeBaseDetailPage() {
 
   async function deleteDoc(docId: string) {
     if (!canManage) return;
-    if (!confirm(t("docs.confirmDelete"))) return;
     try {
       const res = await fetch(`/api/documents/${docId}/process`, {
         method: "DELETE",
@@ -234,7 +255,8 @@ export default function KnowledgeBaseDetailPage() {
         return;
       }
       toast.success(t("docs.deleted"));
-      await load();
+      if (previewDocId === docId) setPreviewDocId(null);
+      await load({ silent: true });
     } catch {
       toast.error(t("docs.deleteFailed"));
     }
@@ -260,7 +282,7 @@ export default function KnowledgeBaseDetailPage() {
       }
       toast.success(t("members.added"));
       setMemberEmail("");
-      await load();
+      await load({ silent: true });
     } catch {
       toast.error(t("members.addFailed"));
     } finally {
@@ -270,7 +292,6 @@ export default function KnowledgeBaseDetailPage() {
 
   async function removeMember(userId: string) {
     if (!canManage) return;
-    if (!confirm(t("members.confirmRemove"))) return;
     try {
       const res = await fetch(`/api/knowledge-bases/${id}/members`, {
         method: "DELETE",
@@ -283,7 +304,7 @@ export default function KnowledgeBaseDetailPage() {
         return;
       }
       toast.success(t("members.removed"));
-      await load();
+      await load({ silent: true });
     } catch {
       toast.error(t("members.removeFailed"));
     }
@@ -291,9 +312,6 @@ export default function KnowledgeBaseDetailPage() {
 
   async function deleteKb() {
     if (!canManage) return;
-    if (!confirm(t("kb.confirmDelete"))) {
-      return;
-    }
     setDeleting(true);
     try {
       const res = await fetch(`/api/knowledge-bases/${id}`, {
@@ -312,6 +330,44 @@ export default function KnowledgeBaseDetailPage() {
       setDeleting(false);
     }
   }
+
+  async function runConfirmedAction() {
+    if (!confirmDialog || confirmBusy) return;
+    setConfirmBusy(true);
+    try {
+      if (confirmDialog.type === "delete-doc") {
+        await deleteDoc(confirmDialog.docId);
+      } else if (confirmDialog.type === "remove-member") {
+        await removeMember(confirmDialog.userId);
+      } else if (confirmDialog.type === "delete-kb") {
+        await deleteKb();
+      }
+      setConfirmDialog(null);
+    } finally {
+      setConfirmBusy(false);
+    }
+  }
+
+  const confirmCopy =
+    confirmDialog?.type === "delete-doc"
+      ? {
+          title: t("docs.confirmDeleteTitle"),
+          description: t("docs.confirmDelete"),
+          action: t("docs.confirmDeleteAction"),
+        }
+      : confirmDialog?.type === "remove-member"
+        ? {
+            title: t("members.confirmRemoveTitle"),
+            description: t("members.confirmRemove"),
+            action: t("members.confirmRemoveAction"),
+          }
+        : confirmDialog?.type === "delete-kb"
+          ? {
+              title: t("kb.confirmDeleteTitle"),
+              description: t("kb.confirmDelete"),
+              action: t("kb.confirmDeleteAction"),
+            }
+          : null;
 
   if (loading) {
     return <LoadingState label={t("kb.loadingDetail")} />;
@@ -349,7 +405,8 @@ export default function KnowledgeBaseDetailPage() {
             <Button
               variant="destructive"
               size="sm"
-              onClick={() => void deleteKb()}
+              type="button"
+              onClick={() => setConfirmDialog({ type: "delete-kb" })}
               disabled={deleting}
             >
               {deleting ? (
@@ -445,6 +502,7 @@ export default function KnowledgeBaseDetailPage() {
                     {statusLabel(t, doc.status)}
                   </Badge>
                   <Button
+                    type="button"
                     size="sm"
                     variant="outline"
                     onClick={() => setPreviewDocId(doc.id)}
@@ -468,6 +526,7 @@ export default function KnowledgeBaseDetailPage() {
                     doc.status !== "ready" &&
                     doc.status !== "processing" && (
                       <Button
+                        type="button"
                         size="sm"
                         variant="outline"
                         disabled={processingId === doc.id}
@@ -483,9 +542,12 @@ export default function KnowledgeBaseDetailPage() {
                     )}
                   {canManage && (
                     <Button
+                      type="button"
                       size="icon-sm"
                       variant="ghost"
-                      onClick={() => void deleteDoc(doc.id)}
+                      onClick={() =>
+                        setConfirmDialog({ type: "delete-doc", docId: doc.id })
+                      }
                       aria-label={t("docs.deleteAria")}
                     >
                       <Trash2 />
@@ -571,9 +633,15 @@ export default function KnowledgeBaseDetailPage() {
                   </Badge>
                   {canManage && (
                     <Button
+                      type="button"
                       size="sm"
                       variant="ghost"
-                      onClick={() => void removeMember(m.userId)}
+                      onClick={() =>
+                        setConfirmDialog({
+                          type: "remove-member",
+                          userId: m.userId,
+                        })
+                      }
                     >
                       {t("members.remove")}
                     </Button>
@@ -593,6 +661,41 @@ export default function KnowledgeBaseDetailPage() {
           if (!open) setPreviewDocId(null);
         }}
       />
+
+      <AlertDialog
+        open={confirmDialog != null}
+        onOpenChange={(open) => {
+          if (!open && !confirmBusy) setConfirmDialog(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmCopy?.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmCopy?.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button" disabled={confirmBusy}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              variant="destructive"
+              disabled={confirmBusy}
+              onClick={(e) => {
+                e.preventDefault();
+                void runConfirmedAction();
+              }}
+            >
+              {confirmBusy ? (
+                <Loader2 className="animate-spin" />
+              ) : null}
+              {confirmCopy?.action}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

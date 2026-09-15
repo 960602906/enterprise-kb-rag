@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, Eye, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,10 @@ export function DocumentPreviewDialog({
   onOpenChange,
 }: Props) {
   const { t } = useI18n();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<DocumentPreviewPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +55,11 @@ export function DocumentPreviewDialog({
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           throw new Error(
-            translateApiError(t, data.error, "docs.previewFailed"),
+            translateApiError(
+              tRef.current,
+              data.error,
+              "docs.previewFailed",
+            ),
           );
         }
         if (!cancelled) {
@@ -60,7 +68,9 @@ export function DocumentPreviewDialog({
       } catch (err) {
         if (!cancelled) {
           const message =
-            err instanceof Error ? err.message : t("docs.previewFailed");
+            err instanceof Error
+              ? err.message
+              : tRef.current("docs.previewFailed");
           setError(message);
           toast.error(message);
         }
@@ -72,7 +82,7 @@ export function DocumentPreviewDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, documentId, t]);
+  }, [open, documentId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -115,7 +125,12 @@ export function DocumentPreviewDialog({
               </Button>
             ) : null}
           </div>
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+          >
             {t("common.close")}
           </Button>
         </DialogFooter>
@@ -178,7 +193,7 @@ export function DocumentPreviewTrigger({
   label: string;
 }) {
   return (
-    <Button size="sm" variant="outline" onClick={onClick}>
+    <Button type="button" size="sm" variant="outline" onClick={onClick}>
       <Eye data-icon="inline-start" />
       {label}
     </Button>

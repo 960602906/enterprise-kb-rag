@@ -20,6 +20,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm eval:unit
+      - run: pnpm eval:api-keys
 
   retrieval:
     runs-on: ubuntu-latest

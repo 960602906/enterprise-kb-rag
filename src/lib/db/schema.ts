@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  boolean,
   customType,
   index,
   integer,
@@ -197,6 +198,53 @@ export const chunks = pgTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/* SearchKnowledge API keys                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Service API keys for `/api/search-knowledge`.
+ * Plaintext is shown once on create/rotate; only `keyHash` is stored.
+ * Hash: SHA-256(pepper || plaintext) — see `src/lib/api-keys/crypto.ts`.
+ */
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: varchar("name", { length: 200 }).notNull(),
+    keyHash: text("key_hash").notNull(),
+    keyPrefix: varchar("key_prefix", { length: 16 }).notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    rateLimitPerMin: integer("rate_limit_per_min"),
+    lastUsedAt: timestamp("last_used_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("api_keys_key_hash_idx").on(t.keyHash),
+    index("api_keys_created_by_idx").on(t.createdBy),
+  ],
+);
+
+export const apiKeyKnowledgeBases = pgTable(
+  "api_key_knowledge_bases",
+  {
+    apiKeyId: uuid("api_key_id")
+      .notNull()
+      .references(() => apiKeys.id, { onDelete: "cascade" }),
+    knowledgeBaseId: uuid("knowledge_base_id")
+      .notNull()
+      .references(() => knowledgeBases.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.apiKeyId, t.knowledgeBaseId] }),
+    index("api_key_kbs_kb_idx").on(t.knowledgeBaseId),
+  ],
+);
+
+/* -------------------------------------------------------------------------- */
 /* Chat & observability                                                       */
 /* -------------------------------------------------------------------------- */
 
@@ -275,7 +323,30 @@ export const usersRelations = relations(users, ({ many }) => ({
   ownedKnowledgeBases: many(knowledgeBases),
   memberships: many(kbMembers),
   chatSessions: many(chatSessions),
+  apiKeys: many(apiKeys),
 }));
+
+export const apiKeysRelations = relations(apiKeys, ({ one, many }) => ({
+  creator: one(users, {
+    fields: [apiKeys.createdBy],
+    references: [users.id],
+  }),
+  knowledgeBases: many(apiKeyKnowledgeBases),
+}));
+
+export const apiKeyKnowledgeBasesRelations = relations(
+  apiKeyKnowledgeBases,
+  ({ one }) => ({
+    apiKey: one(apiKeys, {
+      fields: [apiKeyKnowledgeBases.apiKeyId],
+      references: [apiKeys.id],
+    }),
+    knowledgeBase: one(knowledgeBases, {
+      fields: [apiKeyKnowledgeBases.knowledgeBaseId],
+      references: [knowledgeBases.id],
+    }),
+  }),
+);
 
 export const knowledgeBasesRelations = relations(
   knowledgeBases,
@@ -287,6 +358,7 @@ export const knowledgeBasesRelations = relations(
     members: many(kbMembers),
     documents: many(documents),
     chunks: many(chunks),
+    apiKeys: many(apiKeyKnowledgeBases),
   }),
 );
 

@@ -21,23 +21,25 @@ const bodySchema = z.object({
   knowledgeBaseIds: z.array(z.string().uuid()).optional(),
 });
 
-function searchLimit(req: Request) {
+function searchLimit(req: Request, perMin?: number | null) {
   return hitRateLimit({
     key: `search-knowledge:${clientIp(req)}`,
-    limit: envInt("SEARCH_RATE_LIMIT_PER_MIN", 60),
+    limit: perMin ?? envInt("SEARCH_RATE_LIMIT_PER_MIN", 60),
   });
 }
 
 /**
  * SkyRoc read-only RAG bypass.
- * Auth: `x-api-key` matching SEARCH_KNOWLEDGE_API_KEY.
+ * Auth: `x-api-key` — DB-issued key (preferred) or legacy SEARCH_KNOWLEDGE_API_KEY.
  */
 export async function POST(req: Request) {
-  const authz = authorizeSearchKnowledge(req);
+  const authz = await authorizeSearchKnowledge(req);
   if (!authz.ok) {
     return NextResponse.json({ error: authz.error }, { status: authz.status });
   }
-  const limited = searchLimit(req);
+  const override =
+    authz.auth.kind === "db" ? authz.auth.rateLimitPerMin : null;
+  const limited = searchLimit(req, override);
   if (!limited.ok) return rateLimitedResponse(limited);
 
   try {
@@ -49,7 +51,7 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    const result = await searchKnowledge(parsed.data);
+    const result = await searchKnowledge(parsed.data, authz.auth);
     return NextResponse.json(result);
   } catch (err) {
     console.error("[search-knowledge]", err);
@@ -58,11 +60,13 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
-  const authz = authorizeSearchKnowledge(req);
+  const authz = await authorizeSearchKnowledge(req);
   if (!authz.ok) {
     return NextResponse.json({ error: authz.error }, { status: authz.status });
   }
-  const limited = searchLimit(req);
+  const override =
+    authz.auth.kind === "db" ? authz.auth.rateLimitPerMin : null;
+  const limited = searchLimit(req, override);
   if (!limited.ok) return rateLimitedResponse(limited);
 
   try {
@@ -91,7 +95,7 @@ export async function GET(req: Request) {
         { status: 400 },
       );
     }
-    const result = await searchKnowledge(parsed.data);
+    const result = await searchKnowledge(parsed.data, authz.auth);
     return NextResponse.json(result);
   } catch (err) {
     console.error("[search-knowledge]", err);

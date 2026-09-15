@@ -212,9 +212,23 @@ Chat and ingest **filter permitted knowledge-base IDs before retrieval**. Never 
 
 ## Service SearchKnowledge
 
-Read-only retrieval API for other services. Callers must treat returned snippets as **context only** — do not invent procedures, field values, ticket IDs, or database writes that are not in the snippets.
+Read-only retrieval API for other services (e.g. SkyRoc). Callers must treat returned snippets as **context only** — do not invent procedures, field values, ticket IDs, or database writes that are not in the snippets.
 
-Resolution order for which KBs are searched:
+### Auth (multi-key)
+
+Pass `x-api-key` on every request. Lookup order:
+
+1. **DB API key** (preferred) — create under **Settings → API keys**. Each key is hashed at rest (`SHA-256` of pepper + secret; pepper = `API_KEY_PEPPER` or `AUTH_SECRET`) and bound to one or more knowledge bases. A key can only read its bound KBs (`request knowledgeBaseIds ∩ key bindings`).
+2. **Legacy env key** — `SEARCH_KNOWLEDGE_API_KEY` still works so existing SkyRoc deploys keep working without a day-one migration. Scope uses `SEARCH_KNOWLEDGE_KB_IDS` / default KB name / `SEARCH_KNOWLEDGE_ALLOW_ALL` as before.
+3. If neither is configured: production returns **503**; development allows **localhost only** and logs a warning.
+
+`SEARCH_KNOWLEDGE_ALLOW_ALL` applies **only** to the legacy env path — never to DB-issued keys.
+
+### Resolve which KBs are searched
+
+**DB key:** `requested ∩ key.boundKbIds` (empty bindings → no results).
+
+**Legacy env key:**
 
 1. Request `knowledgeBaseIds` ∩ `SEARCH_KNOWLEDGE_KB_IDS` (if the allowlist is set)
 2. Else the allowlist itself
@@ -224,6 +238,13 @@ Resolution order for which KBs are searched:
 ### Call
 
 ```bash
+# DB-issued key (from Settings → API keys)
+curl -sS -X POST http://localhost:43123/api/search-knowledge \
+  -H "content-type: application/json" \
+  -H "x-api-key: $ATLAS_SEARCH_API_KEY" \
+  -d '{"query":"How many PTO days?","topK":8,"knowledgeBaseIds":["<kb-uuid>"]}'
+
+# Legacy env key (SkyRoc today)
 curl -sS -X POST http://localhost:43123/api/search-knowledge \
   -H "content-type: application/json" \
   -H "x-api-key: $SEARCH_KNOWLEDGE_API_KEY" \
@@ -237,13 +258,30 @@ curl -sS -X POST http://localhost:43123/api/search-knowledge \
 | `query` | Required |
 | `topK` | Optional, 1–50 (default 8) |
 | `docTypes` | Optional `flow` \| `rule` \| `faq`. Untagged chunks stay eligible |
-| `knowledgeBaseIds` | Optional; constrained by the allowlist above |
+| `knowledgeBaseIds` | Optional; constrained by the authenticated key’s allowlist |
 
 Response: `{ "items": [{ "title", "snippet", "sourcePath", "score", "docType"? }] }`.
 
-Auth: header `x-api-key` must match `SEARCH_KNOWLEDGE_API_KEY`. If the env is unset, production returns 503; development allows **localhost only** and logs a warning.
+This route does **not** stream chat or call the LLM. Existing `/api/chat` RAG is unchanged. Upload/chat/admin document APIs are **not** opened to API keys.
 
-This route does **not** stream chat or call the LLM. Existing `/api/chat` RAG is unchanged.
+### Admin API (session + manage role)
+
+| Method | Path | Notes |
+|--------|------|--------|
+| `GET` | `/api/api-keys` | List keys (prefix only) + manageable KBs |
+| `POST` | `/api/api-keys` | Create; returns plaintext **once** |
+| `PATCH` | `/api/api-keys/:id` | Update name / enabled / bound KBs |
+| `DELETE` | `/api/api-keys/:id` | Revoke |
+| `POST` | `/api/api-keys/:id/rotate` | New secret; old one stops working |
+
+You may only bind knowledge bases you can `manage`. UI: `/settings/api-keys`.
+
+### Migrating SkyRoc off the env key
+
+1. Sign in as a user who can manage the target KB(s).
+2. **Settings → API keys → New key**, bind the same KB UUID(s) SkyRoc uses today.
+3. Copy the plaintext secret once into SkyRoc’s `x-api-key` config.
+4. Confirm search works, then remove `SEARCH_KNOWLEDGE_API_KEY` from Atlas when ready.
 
 ### Chunking defaults
 

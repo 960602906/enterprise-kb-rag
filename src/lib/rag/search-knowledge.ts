@@ -1,4 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import type { SearchApiKeyAuth } from "@/lib/api-keys/service";
+import { findEnabledApiKeyBySecret } from "@/lib/api-keys/service";
 import { isDocType, type DocType } from "./chunk-config";
 import { getRetrievalConfig } from "./retrieval-config";
 import { hybridRetrieve, makeSnippet } from "./retrieve";
@@ -28,15 +30,35 @@ export type SearchKnowledgeResponse = {
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
 export type AuthResult =
-  | { ok: true }
+  | { ok: true; auth: SearchApiKeyAuth }
   | { ok: false; status: number; error: string };
 
-export function authorizeSearchKnowledge(req: Request): AuthResult {
-  const expected = process.env.SEARCH_KNOWLEDGE_API_KEY?.trim() ?? "";
+/**
+ * Auth for `/api/search-knowledge`.
+ *
+ * Lookup order:
+ * 1. Enabled DB API key (SHA-256 hash) → scoped to bound KBs
+ * 2. Legacy env `SEARCH_KNOWLEDGE_API_KEY` (+ env KB allowlist / ALLOW_ALL)
+ * 3. Development localhost when no env key is configured
+ */
+export async function authorizeSearchKnowledge(
+  req: Request,
+): Promise<AuthResult> {
   const provided = req.headers.get("x-api-key")?.trim() ?? "";
 
-  if (expected) {
-    if (provided && apiKeysEqual(provided, expected)) return { ok: true };
+  if (provided) {
+    try {
+      const dbAuth = await findEnabledApiKeyBySecret(provided);
+      if (dbAuth) return { ok: true, auth: dbAuth };
+    } catch (err) {
+      console.error("[search-knowledge] DB API key lookup failed", err);
+    }
+
+    const expected = process.env.SEARCH_KNOWLEDGE_API_KEY?.trim() ?? "";
+    if (expected && apiKeysEqual(provided, expected)) {
+      return { ok: true, auth: { kind: "legacy" } };
+    }
+
     return {
       ok: false,
       status: 401,
@@ -44,6 +66,17 @@ export function authorizeSearchKnowledge(req: Request): AuthResult {
     };
   }
 
+  const expected = process.env.SEARCH_KNOWLEDGE_API_KEY?.trim() ?? "";
+  if (expected) {
+    return {
+      ok: false,
+      status: 401,
+      error: "Invalid or missing x-api-key",
+    };
+  }
+
+  // No plaintext provided and no legacy env key.
+  // Still try nothing in production; allow localhost in development.
   if (process.env.NODE_ENV === "production") {
     return {
       ok: false,
@@ -56,7 +89,7 @@ export function authorizeSearchKnowledge(req: Request): AuthResult {
     console.warn(
       "[search-knowledge] SEARCH_KNOWLEDGE_API_KEY is unset; allowing localhost in development. Set the key before exposing this API.",
     );
-    return { ok: true };
+    return { ok: true, auth: { kind: "dev-localhost" } };
   }
 
   return {
@@ -89,9 +122,22 @@ function isLocalRequest(req: Request): boolean {
 
 export async function searchKnowledge(
   input: SearchKnowledgeRequest,
+  auth: SearchApiKeyAuth,
 ): Promise<SearchKnowledgeResponse> {
+  const scope =
+    auth.kind === "db"
+      ? {
+          allowlist: auth.knowledgeBaseIds,
+          legacyEnvScope: false,
+        }
+      : {
+          // legacy + localhost keep SEARCH_KNOWLEDGE_* behavior
+          legacyEnvScope: true,
+        };
+
   const permittedKbIds = await resolveSearchKnowledgeBaseIds(
     input.knowledgeBaseIds,
+    scope,
   );
   if (permittedKbIds.length === 0) return { items: [] };
 

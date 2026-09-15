@@ -130,6 +130,7 @@ export default function KnowledgeBaseDetailPage() {
   const [addingMember, setAddingMember] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [previewDocId, setPreviewDocId] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<
     | { type: "delete-doc"; docId: string }
     | { type: "remove-member"; userId: string }
@@ -413,10 +414,21 @@ export default function KnowledgeBaseDetailPage() {
               variant="destructive"
               size="sm"
               type="button"
-              onClick={() => setConfirmDialog({ type: "delete-kb" })}
-              disabled={deleting}
+              onClick={() => {
+                if (confirmBusy) return;
+                setConfirmDialog({ type: "delete-kb" });
+              }}
+              disabled={
+                deleting ||
+                (confirmBusy && confirmDialog?.type === "delete-kb")
+              }
+              aria-busy={
+                deleting ||
+                (confirmBusy && confirmDialog?.type === "delete-kb")
+              }
             >
-              {deleting ? (
+              {deleting ||
+              (confirmBusy && confirmDialog?.type === "delete-kb") ? (
                 <Loader2 className="animate-spin" />
               ) : (
                 <Trash2 data-icon="inline-start" />
@@ -447,6 +459,7 @@ export default function KnowledgeBaseDetailPage() {
                   accept=".pdf,.md,.txt,.docx,application/pdf,text/markdown,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                   required
+                  disabled={uploading}
                   className="h-auto cursor-pointer py-2 file:mr-3 file:rounded-lg file:bg-muted file:px-2.5"
                 />
               </div>
@@ -457,10 +470,11 @@ export default function KnowledgeBaseDetailPage() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder={t("docs.titlePlaceholder")}
+                  disabled={uploading}
                 />
               </div>
             </div>
-            <Button type="submit" disabled={uploading || !file}>
+            <Button type="submit" disabled={uploading || !file} aria-busy={uploading}>
               {uploading ? (
                 <Loader2 className="animate-spin" />
               ) : (
@@ -512,9 +526,15 @@ export default function KnowledgeBaseDetailPage() {
                     type="button"
                     size="sm"
                     variant="outline"
+                    disabled={previewDocId === doc.id && previewLoading}
+                    aria-busy={previewDocId === doc.id && previewLoading}
                     onClick={() => setPreviewDocId(doc.id)}
                   >
-                    <Eye data-icon="inline-start" />
+                    {previewDocId === doc.id && previewLoading ? (
+                      <Loader2 className="animate-spin" data-icon="inline-start" />
+                    ) : (
+                      <Eye data-icon="inline-start" />
+                    )}
                     {t("docs.preview")}
                   </Button>
                   {prefersDownloadAction(doc.filename) && (
@@ -536,7 +556,8 @@ export default function KnowledgeBaseDetailPage() {
                         type="button"
                         size="sm"
                         variant="outline"
-                        disabled={processingId === doc.id}
+                        disabled={processingId === doc.id || confirmBusy}
+                        aria-busy={processingId === doc.id}
                         onClick={() => void processDoc(doc.id)}
                       >
                         {processingId === doc.id ? (
@@ -552,12 +573,29 @@ export default function KnowledgeBaseDetailPage() {
                       type="button"
                       size="icon-sm"
                       variant="ghost"
-                      onClick={() =>
-                        setConfirmDialog({ type: "delete-doc", docId: doc.id })
+                      disabled={
+                        confirmBusy &&
+                        confirmDialog?.type === "delete-doc" &&
+                        confirmDialog.docId === doc.id
                       }
+                      aria-busy={
+                        confirmBusy &&
+                        confirmDialog?.type === "delete-doc" &&
+                        confirmDialog.docId === doc.id
+                      }
+                      onClick={() => {
+                        if (confirmBusy) return;
+                        setConfirmDialog({ type: "delete-doc", docId: doc.id });
+                      }}
                       aria-label={t("docs.deleteAria")}
                     >
-                      <Trash2 />
+                      {confirmBusy &&
+                      confirmDialog?.type === "delete-doc" &&
+                      confirmDialog.docId === doc.id ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <Trash2 />
+                      )}
                     </Button>
                   )}
                 </div>
@@ -588,6 +626,7 @@ export default function KnowledgeBaseDetailPage() {
                 onChange={(e) => setMemberEmail(e.target.value)}
                 placeholder={t("members.emailPlaceholder")}
                 required
+                disabled={addingMember}
               />
             </div>
             <div className="w-36 space-y-2">
@@ -595,6 +634,7 @@ export default function KnowledgeBaseDetailPage() {
               <Select
                 value={memberRole}
                 onValueChange={(v) => setMemberRole(v as "read" | "manage")}
+                disabled={addingMember}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -605,7 +645,7 @@ export default function KnowledgeBaseDetailPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" disabled={addingMember}>
+            <Button type="submit" disabled={addingMember} aria-busy={addingMember}>
               {addingMember ? (
                 <Loader2 className="animate-spin" />
               ) : (
@@ -643,13 +683,29 @@ export default function KnowledgeBaseDetailPage() {
                       type="button"
                       size="sm"
                       variant="ghost"
-                      onClick={() =>
+                      disabled={
+                        confirmBusy &&
+                        confirmDialog?.type === "remove-member" &&
+                        confirmDialog.userId === m.userId
+                      }
+                      aria-busy={
+                        confirmBusy &&
+                        confirmDialog?.type === "remove-member" &&
+                        confirmDialog.userId === m.userId
+                      }
+                      onClick={() => {
+                        if (confirmBusy) return;
                         setConfirmDialog({
                           type: "remove-member",
                           userId: m.userId,
-                        })
-                      }
+                        });
+                      }}
                     >
+                      {confirmBusy &&
+                      confirmDialog?.type === "remove-member" &&
+                      confirmDialog.userId === m.userId ? (
+                        <Loader2 className="animate-spin" data-icon="inline-start" />
+                      ) : null}
                       {t("members.remove")}
                     </Button>
                   )}
@@ -665,8 +721,12 @@ export default function KnowledgeBaseDetailPage() {
         documentId={previewDocId}
         open={previewDocId != null}
         onOpenChange={(open) => {
-          if (!open) setPreviewDocId(null);
+          if (!open) {
+            setPreviewDocId(null);
+            setPreviewLoading(false);
+          }
         }}
+        onLoadingChange={setPreviewLoading}
       />
 
       <AlertDialog
@@ -690,6 +750,7 @@ export default function KnowledgeBaseDetailPage() {
               type="button"
               variant="destructive"
               disabled={confirmBusy}
+              aria-busy={confirmBusy}
               onClick={(e) => {
                 e.preventDefault();
                 void runConfirmedAction();

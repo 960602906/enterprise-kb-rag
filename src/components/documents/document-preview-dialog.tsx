@@ -20,12 +20,14 @@ type Props = {
   documentId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onLoadingChange?: (loading: boolean) => void;
 };
 
 export function DocumentPreviewDialog({
   documentId,
   open,
   onOpenChange,
+  onLoadingChange,
 }: Props) {
   const { t } = useI18n();
   const tRef = useRef(t);
@@ -33,6 +35,9 @@ export function DocumentPreviewDialog({
     tRef.current = t;
   }, [t]);
   const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    onLoadingChange?.(loading);
+  }, [loading, onLoadingChange]);
   const [preview, setPreview] = useState<DocumentPreviewPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,11 +104,14 @@ export function DocumentPreviewDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
+        <div
+          className="min-h-0 flex-1 overflow-auto px-6 py-4"
+          aria-busy={loading}
+        >
           {loading ? (
-            <div className="flex min-h-[280px] items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              {t("docs.previewLoading")}
+            <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+              <Loader2 className="size-5 animate-spin" />
+              <span>{t("docs.previewLoading")}</span>
             </div>
           ) : error ? (
             <div className="flex min-h-[200px] items-center justify-center text-sm text-destructive">

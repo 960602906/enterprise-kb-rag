@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import type { SearchApiKeyAuth } from "@/lib/api-keys/service";
 import { DOC_TYPES } from "@/lib/rag/chunk-config";
 import {
   authorizeSearchKnowledge,
@@ -21,10 +22,16 @@ const bodySchema = z.object({
   knowledgeBaseIds: z.array(z.string().uuid()).optional(),
 });
 
-function searchLimit(req: Request, perMin?: number | null) {
+function searchLimit(req: Request, auth: SearchApiKeyAuth) {
+  if (auth.kind === "db") {
+    return hitRateLimit({
+      key: `search-knowledge:db:${auth.apiKeyId}`,
+      limit: auth.rateLimitPerMin ?? envInt("SEARCH_RATE_LIMIT_PER_MIN", 60),
+    });
+  }
   return hitRateLimit({
     key: `search-knowledge:${clientIp(req)}`,
-    limit: perMin ?? envInt("SEARCH_RATE_LIMIT_PER_MIN", 60),
+    limit: envInt("SEARCH_RATE_LIMIT_PER_MIN", 60),
   });
 }
 
@@ -37,9 +44,7 @@ export async function POST(req: Request) {
   if (!authz.ok) {
     return NextResponse.json({ error: authz.error }, { status: authz.status });
   }
-  const override =
-    authz.auth.kind === "db" ? authz.auth.rateLimitPerMin : null;
-  const limited = searchLimit(req, override);
+  const limited = searchLimit(req, authz.auth);
   if (!limited.ok) return rateLimitedResponse(limited);
 
   try {
@@ -64,9 +69,7 @@ export async function GET(req: Request) {
   if (!authz.ok) {
     return NextResponse.json({ error: authz.error }, { status: authz.status });
   }
-  const override =
-    authz.auth.kind === "db" ? authz.auth.rateLimitPerMin : null;
-  const limited = searchLimit(req, override);
+  const limited = searchLimit(req, authz.auth);
   if (!limited.ok) return rateLimitedResponse(limited);
 
   try {

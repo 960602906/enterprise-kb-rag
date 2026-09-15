@@ -176,12 +176,12 @@ export async function listApiKeysForUser(
   const items: ApiKeyListItem[] = [];
   for (const row of byId.values()) {
     const kbs = await loadKeyKnowledgeBases(row.id);
-    // Hide keys whose bound KBs the user cannot manage (except own creations).
-    const canSee =
-      row.createdBy === userId ||
-      kbs.some((kb) => manageableIds.includes(kb.id));
+    const isCreator = row.createdBy === userId;
+    const manageableBound = kbs.filter((kb) => manageableIds.includes(kb.id));
+    const canSee = isCreator || manageableBound.length > 0;
     if (!canSee) continue;
-    items.push(toListItem(row, kbs));
+    // Non-creators only see KB bindings they can manage (no cross-tenant leak).
+    items.push(toListItem(row, isCreator ? kbs : manageableBound));
   }
 
   items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -200,11 +200,13 @@ async function assertCanAdminKey(
   if (!row) throw new AccessError("API key not found", 404);
 
   const kbs = await loadKeyKnowledgeBases(apiKeyId);
-  if (row.createdBy === userId) return row;
-
   if (kbs.length === 0) {
+    // Unbound key: only the creator may delete/disable it for cleanup.
+    if (row.createdBy === userId) return row;
     throw new AccessError("API key not found or access denied", 404);
   }
+
+  // Always require manage on every currently bound KB (including creator).
   for (const kb of kbs) {
     const role = await getKbRole(userId, kb.id);
     if (role !== "manage") {

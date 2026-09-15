@@ -6,6 +6,8 @@ import { deleteApiKey, updateApiKey } from "@/lib/api-keys/service";
 
 type Ctx = { params: Promise<{ id: string }> };
 
+const idSchema = z.string().uuid();
+
 const patchSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
   enabled: z.boolean().optional(),
@@ -17,7 +19,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
   try {
     const session = await auth();
     const userId = await requireUserId(session);
-    const { id } = await ctx.params;
+    const { id: rawId } = await ctx.params;
+    const id = idSchema.parse(rawId);
     const body = patchSchema.parse(await req.json());
     if (
       body.name === undefined &&
@@ -48,7 +51,8 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   try {
     const session = await auth();
     const userId = await requireUserId(session);
-    const { id } = await ctx.params;
+    const { id: rawId } = await ctx.params;
+    const id = idSchema.parse(rawId);
     await deleteApiKey(userId, id);
     return NextResponse.json({ ok: true });
   } catch (err) {

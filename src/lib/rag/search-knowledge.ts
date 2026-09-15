@@ -66,6 +66,8 @@ export async function authorizeSearchKnowledge(
     };
   }
 
+  // Missing header: never treat as "unconfigured" once DB keys are in use —
+  // always 401 except localhost-dev when the legacy env key is also unset.
   const expected = process.env.SEARCH_KNOWLEDGE_API_KEY?.trim() ?? "";
   if (expected) {
     return {
@@ -75,19 +77,17 @@ export async function authorizeSearchKnowledge(
     };
   }
 
-  // No plaintext provided and no legacy env key.
-  // Still try nothing in production; allow localhost in development.
   if (process.env.NODE_ENV === "production") {
     return {
       ok: false,
-      status: 503,
-      error: "SEARCH_KNOWLEDGE_API_KEY is not configured",
+      status: 401,
+      error: "Invalid or missing x-api-key",
     };
   }
 
   if (isLocalRequest(req)) {
     console.warn(
-      "[search-knowledge] SEARCH_KNOWLEDGE_API_KEY is unset; allowing localhost in development. Set the key before exposing this API.",
+      "[search-knowledge] no x-api-key; allowing localhost in development. Prefer a DB-issued key or SEARCH_KNOWLEDGE_API_KEY before exposing this API.",
     );
     return { ok: true, auth: { kind: "dev-localhost" } };
   }
@@ -96,7 +96,7 @@ export async function authorizeSearchKnowledge(
     ok: false,
     status: 401,
     error:
-      "SEARCH_KNOWLEDGE_API_KEY is unset; only localhost is allowed in development",
+      "x-api-key is required; only localhost is allowed without a key in development",
   };
 }
 

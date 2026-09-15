@@ -220,7 +220,7 @@ Pass `x-api-key` on every request. Lookup order:
 
 1. **DB API key** (preferred) — create under **Settings → API keys**. Each key is hashed at rest (`SHA-256` of pepper + secret; pepper = `API_KEY_PEPPER` or `AUTH_SECRET`) and bound to one or more knowledge bases. A key can only read its bound KBs (`request knowledgeBaseIds ∩ key bindings`).
 2. **Legacy env key** — `SEARCH_KNOWLEDGE_API_KEY` still works so existing SkyRoc deploys keep working without a day-one migration. Scope uses `SEARCH_KNOWLEDGE_KB_IDS` / default KB name / `SEARCH_KNOWLEDGE_ALLOW_ALL` as before.
-3. If neither is configured: production returns **503**; development allows **localhost only** and logs a warning.
+3. If neither is configured: missing `x-api-key` returns **401**; development allows **localhost only** without a key and logs a warning.
 
 `SEARCH_KNOWLEDGE_ALLOW_ALL` applies **only** to the legacy env path — never to DB-issued keys.
 

@@ -47,17 +47,9 @@ export async function resolveSearchKnowledgeBaseIds(
   requested?: string[],
   options?: ResolveSearchKbOptions,
 ): Promise<string[]> {
-  const legacy = options?.legacyEnvScope !== false && options?.allowlist === undefined;
-  const allowlist =
-    options?.allowlist !== undefined
-      ? options.allowlist
-      : legacy
-        ? envKbAllowlist()
-        : null;
-
   // DB-backed key path: hard-scoped to bound KBs (ALLOW_ALL disabled).
-  if (options?.allowlist !== undefined) {
-    const bound = allowlist ?? [];
+  if (options?.allowlist !== undefined || options?.legacyEnvScope === false) {
+    const bound = options?.allowlist ?? [];
     if (bound.length === 0) return [];
 
     if (requested?.length) {
@@ -69,6 +61,8 @@ export async function resolveSearchKnowledgeBaseIds(
   }
 
   // Legacy env / localhost path
+  const allowlist = envKbAllowlist();
+
   if (requested?.length) {
     const unique = [...new Set(requested)];
     const scoped = allowlist

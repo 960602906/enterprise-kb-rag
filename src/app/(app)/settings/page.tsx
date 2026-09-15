@@ -1,9 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { KeyRound } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { LanguageToggle } from "@/components/layout/language-toggle";
 import { ThemeSwitch } from "@/components/layout/theme-switch";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -62,6 +65,21 @@ export default function SettingsPage() {
             {email ? (
               <p className="text-muted-foreground">{email}</p>
             ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <KeyRound className="size-5" />
+              {t("settings.apiKeys")}
+            </CardTitle>
+            <CardDescription>{t("settings.apiKeysBody")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href="/settings/api-keys">{t("settings.apiKeysLink")}</Link>
+            </Button>
           </CardContent>
         </Card>
       </div>

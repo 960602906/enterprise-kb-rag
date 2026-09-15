@@ -1,10 +1,16 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import type { SearchApiKeyAuth } from "@/lib/api-keys/service";
+import { findApiKeyBySecret } from "@/lib/api-keys/service";
 import { isDocType, type DocType } from "./chunk-config";
 import { getRetrievalConfig } from "./retrieval-config";
 import { hybridRetrieve, makeSnippet } from "./retrieve";
-import { resolveSearchKnowledgeBaseIds } from "./search-scope";
+import {
+  evaluateDbKeyScope,
+  resolveSearchKnowledgeBaseIds,
+} from "./search-scope";
 
 export { resolveSearchKnowledgeBaseIds } from "./search-scope";
+export { evaluateDbKeyScope } from "./search-scope-pure";
 
 export type SearchKnowledgeRequest = {
   query: string;
@@ -25,18 +31,69 @@ export type SearchKnowledgeResponse = {
   items: SearchKnowledgeItem[];
 };
 
+export type SearchKnowledgeResult =
+  | { ok: true; response: SearchKnowledgeResponse }
+  | { ok: false; status: number; error: string };
+
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
 export type AuthResult =
-  | { ok: true }
+  | { ok: true; auth: SearchApiKeyAuth }
   | { ok: false; status: number; error: string };
 
-export function authorizeSearchKnowledge(req: Request): AuthResult {
-  const expected = process.env.SEARCH_KNOWLEDGE_API_KEY?.trim() ?? "";
+/**
+ * Auth for `/api/search-knowledge`.
+ *
+ * Lookup order:
+ * 1. DB API key by hash → enabled + scoped to bound KBs; disabled → 401
+ * 2. Legacy env `SEARCH_KNOWLEDGE_API_KEY` (+ env KB allowlist / ALLOW_ALL)
+ * 3. Development localhost when no env key is configured
+ */
+export async function authorizeSearchKnowledge(
+  req: Request,
+): Promise<AuthResult> {
   const provided = req.headers.get("x-api-key")?.trim() ?? "";
 
+  if (provided) {
+    try {
+      const dbKey = await findApiKeyBySecret(provided);
+      if (dbKey) {
+        if (!dbKey.enabled) {
+          return {
+            ok: false,
+            status: 401,
+            error: "Invalid or missing x-api-key",
+          };
+        }
+        return {
+          ok: true,
+          auth: {
+            kind: "db",
+            apiKeyId: dbKey.apiKeyId,
+            knowledgeBaseIds: dbKey.knowledgeBaseIds,
+            rateLimitPerMin: dbKey.rateLimitPerMin,
+          },
+        };
+      }
+    } catch (err) {
+      console.error("[search-knowledge] DB API key lookup failed", err);
+    }
+
+    const expected = process.env.SEARCH_KNOWLEDGE_API_KEY?.trim() ?? "";
+    if (expected && apiKeysEqual(provided, expected)) {
+      return { ok: true, auth: { kind: "legacy" } };
+    }
+
+    return {
+      ok: false,
+      status: 401,
+      error: "Invalid or missing x-api-key",
+    };
+  }
+
+  // Missing header: 401 except localhost-dev when the legacy env key is unset.
+  const expected = process.env.SEARCH_KNOWLEDGE_API_KEY?.trim() ?? "";
   if (expected) {
-    if (provided && apiKeysEqual(provided, expected)) return { ok: true };
     return {
       ok: false,
       status: 401,
@@ -47,23 +104,23 @@ export function authorizeSearchKnowledge(req: Request): AuthResult {
   if (process.env.NODE_ENV === "production") {
     return {
       ok: false,
-      status: 503,
-      error: "SEARCH_KNOWLEDGE_API_KEY is not configured",
+      status: 401,
+      error: "Invalid or missing x-api-key",
     };
   }
 
   if (isLocalRequest(req)) {
     console.warn(
-      "[search-knowledge] SEARCH_KNOWLEDGE_API_KEY is unset; allowing localhost in development. Set the key before exposing this API.",
+      "[search-knowledge] no x-api-key; allowing localhost in development. Prefer a DB-issued key or SEARCH_KNOWLEDGE_API_KEY before exposing this API.",
     );
-    return { ok: true };
+    return { ok: true, auth: { kind: "dev-localhost" } };
   }
 
   return {
     ok: false,
     status: 401,
     error:
-      "SEARCH_KNOWLEDGE_API_KEY is unset; only localhost is allowed in development",
+      "x-api-key is required; only localhost is allowed without a key in development",
   };
 }
 
@@ -87,13 +144,45 @@ function isLocalRequest(req: Request): boolean {
   return true;
 }
 
+/**
+ * Search with ACL applied *before* retrieval (no retrieve-then-filter).
+ * DB keys: unbound or any foreign knowledgeBaseId → 403.
+ */
 export async function searchKnowledge(
   input: SearchKnowledgeRequest,
-): Promise<SearchKnowledgeResponse> {
-  const permittedKbIds = await resolveSearchKnowledgeBaseIds(
-    input.knowledgeBaseIds,
-  );
-  if (permittedKbIds.length === 0) return { items: [] };
+  auth: SearchApiKeyAuth,
+): Promise<SearchKnowledgeResult> {
+  let permittedKbIds: string[];
+
+  if (auth.kind === "db") {
+    const scope = evaluateDbKeyScope(
+      input.knowledgeBaseIds,
+      auth.knowledgeBaseIds,
+    );
+    if (!scope.ok) {
+      return { ok: false, status: scope.status, error: scope.error };
+    }
+    // Verify ids still exist; missing rows are dropped (not foreign — already checked).
+    permittedKbIds = await resolveSearchKnowledgeBaseIds(undefined, {
+      allowlist: scope.ids,
+      legacyEnvScope: false,
+    });
+    console.info(
+      `[search-knowledge] auth=db keyId=${auth.apiKeyId} requested=${input.knowledgeBaseIds?.length ?? 0} permitted=${permittedKbIds.length}`,
+    );
+  } else {
+    permittedKbIds = await resolveSearchKnowledgeBaseIds(
+      input.knowledgeBaseIds,
+      { legacyEnvScope: true },
+    );
+    console.info(
+      `[search-knowledge] auth=${auth.kind} permitted=${permittedKbIds.length}`,
+    );
+  }
+
+  if (permittedKbIds.length === 0) {
+    return { ok: true, response: { items: [] } };
+  }
 
   const docTypes = input.docTypes?.filter(isDocType);
   const cfg = getRetrievalConfig();
@@ -116,5 +205,5 @@ export async function searchKnowledge(
     return item;
   });
 
-  return { items };
+  return { ok: true, response: { items } };
 }

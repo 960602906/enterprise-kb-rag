@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import type { SearchApiKeyAuth } from "@/lib/api-keys/service";
 import { DOC_TYPES } from "@/lib/rag/chunk-config";
 import {
   authorizeSearchKnowledge,
@@ -21,7 +22,13 @@ const bodySchema = z.object({
   knowledgeBaseIds: z.array(z.string().uuid()).optional(),
 });
 
-function searchLimit(req: Request) {
+function searchLimit(req: Request, auth: SearchApiKeyAuth) {
+  if (auth.kind === "db") {
+    return hitRateLimit({
+      key: `search-knowledge:db:${auth.apiKeyId}`,
+      limit: auth.rateLimitPerMin ?? envInt("SEARCH_RATE_LIMIT_PER_MIN", 60),
+    });
+  }
   return hitRateLimit({
     key: `search-knowledge:${clientIp(req)}`,
     limit: envInt("SEARCH_RATE_LIMIT_PER_MIN", 60),
@@ -30,14 +37,14 @@ function searchLimit(req: Request) {
 
 /**
  * SkyRoc read-only RAG bypass.
- * Auth: `x-api-key` matching SEARCH_KNOWLEDGE_API_KEY.
+ * Auth: `x-api-key` — DB-issued key (preferred) or legacy SEARCH_KNOWLEDGE_API_KEY.
  */
 export async function POST(req: Request) {
-  const authz = authorizeSearchKnowledge(req);
+  const authz = await authorizeSearchKnowledge(req);
   if (!authz.ok) {
     return NextResponse.json({ error: authz.error }, { status: authz.status });
   }
-  const limited = searchLimit(req);
+  const limited = searchLimit(req, authz.auth);
   if (!limited.ok) return rateLimitedResponse(limited);
 
   try {
@@ -49,8 +56,14 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    const result = await searchKnowledge(parsed.data);
-    return NextResponse.json(result);
+    const result = await searchKnowledge(parsed.data, authz.auth);
+    if (!result.ok) {
+      return NextResponse.json(
+        { error: result.error },
+        { status: result.status },
+      );
+    }
+    return NextResponse.json(result.response);
   } catch (err) {
     console.error("[search-knowledge]", err);
     return NextResponse.json({ error: "Search failed" }, { status: 500 });
@@ -58,11 +71,11 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
-  const authz = authorizeSearchKnowledge(req);
+  const authz = await authorizeSearchKnowledge(req);
   if (!authz.ok) {
     return NextResponse.json({ error: authz.error }, { status: authz.status });
   }
-  const limited = searchLimit(req);
+  const limited = searchLimit(req, authz.auth);
   if (!limited.ok) return rateLimitedResponse(limited);
 
   try {
@@ -91,8 +104,14 @@ export async function GET(req: Request) {
         { status: 400 },
       );
     }
-    const result = await searchKnowledge(parsed.data);
-    return NextResponse.json(result);
+    const result = await searchKnowledge(parsed.data, authz.auth);
+    if (!result.ok) {
+      return NextResponse.json(
+        { error: result.error },
+        { status: result.status },
+      );
+    }
+    return NextResponse.json(result.response);
   } catch (err) {
     console.error("[search-knowledge]", err);
     return NextResponse.json({ error: "Search failed" }, { status: 500 });

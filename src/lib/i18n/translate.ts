@@ -76,6 +76,11 @@ const API_ERROR_MAP: Record<string, MessageKey> = {
   "Chat failed": "errors.chatFailed",
   "Knowledge base not found or access denied": "errors.accessDenied",
   "Manage permission required": "errors.manageRequired",
+  "Manage permission required for all bound knowledge bases":
+    "errors.manageRequired",
+  "At least one knowledge base is required": "apiKeys.selectKb",
+  "API key not found": "errors.notFound",
+  "API key not found or access denied": "errors.accessDenied",
   "Failed to load": "errors.loadFailed",
   "Failed to load KB": "errors.loadFailed",
   Failed: "errors.internal",

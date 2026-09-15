@@ -2,26 +2,70 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { knowledgeBases } from "@/lib/db/schema";
 import { defaultSearchKnowledgeBaseName } from "./chunk-config";
+import {
+  allowAllKnowledgeBases,
+  evaluateDbKeyScope,
+} from "./search-scope-pure";
 
-function apiKeyKbAllowlist(): string[] | null {
+export {
+  allowAllKnowledgeBases,
+  evaluateDbKeyScope,
+  type DbKeyScopeResult,
+} from "./search-scope-pure";
+
+function envKbAllowlist(): string[] | null {
   const raw = process.env.SEARCH_KNOWLEDGE_KB_IDS?.trim();
   if (!raw) return null;
   const ids = raw.split(/[,\s]+/).filter(Boolean);
   return ids.length ? ids : null;
 }
 
-function allowAllKnowledgeBases(): boolean {
-  return process.env.SEARCH_KNOWLEDGE_ALLOW_ALL === "true";
+export type ResolveSearchKbOptions = {
+  /**
+   * Explicit allowlist from an authenticated DB API key.
+   * When set, `SEARCH_KNOWLEDGE_ALLOW_ALL` is ignored — the key may only
+   * read its bound knowledge bases (intersection with the request).
+   */
+  allowlist?: string[] | null;
+  /**
+   * When true (legacy env path only), fall back to env allowlist / default
+   * name / ALLOW_ALL. When false (DB key), never expand beyond `allowlist`.
+   */
+  legacyEnvScope?: boolean;
+};
+
+async function existingIds(ids: string[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const rows = await db
+    .select({ id: knowledgeBases.id })
+    .from(knowledgeBases)
+    .where(inArray(knowledgeBases.id, ids));
+  return rows.map((r) => r.id);
 }
 
 /**
- * Resolve KBs the service key may read.
- * Never scans every knowledge base unless SEARCH_KNOWLEDGE_ALLOW_ALL=true.
+ * Resolve KBs the caller may read.
+ *
+ * - DB API key: use `evaluateDbKeyScope` then verify ids exist.
+ * - Legacy env key / localhost: SEARCH_KNOWLEDGE_* behavior (ALLOW_ALL gated in prod).
  */
 export async function resolveSearchKnowledgeBaseIds(
   requested?: string[],
+  options?: ResolveSearchKbOptions,
 ): Promise<string[]> {
-  const allowlist = apiKeyKbAllowlist();
+  // DB-backed key path: hard-scoped to bound KBs (ALLOW_ALL disabled).
+  if (options?.allowlist !== undefined || options?.legacyEnvScope === false) {
+    const bound = options?.allowlist ?? [];
+    const scope = evaluateDbKeyScope(requested, bound);
+    if (!scope.ok) {
+      // Caller should prefer evaluateDbKeyScope for 403; keep fail-closed empty.
+      return [];
+    }
+    return existingIds(scope.ids);
+  }
+
+  // Legacy env / localhost path
+  const allowlist = envKbAllowlist();
 
   if (requested?.length) {
     const unique = [...new Set(requested)];
@@ -29,19 +73,11 @@ export async function resolveSearchKnowledgeBaseIds(
       ? unique.filter((id) => allowlist.includes(id))
       : unique;
     if (scoped.length === 0) return [];
-    const rows = await db
-      .select({ id: knowledgeBases.id })
-      .from(knowledgeBases)
-      .where(inArray(knowledgeBases.id, scoped));
-    return rows.map((r) => r.id);
+    return existingIds(scoped);
   }
 
   if (allowlist?.length) {
-    const rows = await db
-      .select({ id: knowledgeBases.id })
-      .from(knowledgeBases)
-      .where(inArray(knowledgeBases.id, allowlist));
-    return rows.map((r) => r.id);
+    return existingIds(allowlist);
   }
 
   const defaultName = defaultSearchKnowledgeBaseName();

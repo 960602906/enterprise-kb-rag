@@ -67,6 +67,8 @@ const API_ERROR_MAP: Record<string, MessageKey> = {
   "Processing failed": "errors.processFailed",
   "Process failed": "docs.processFailed",
   "Delete failed": "errors.deleteFailed",
+  "Preview failed": "docs.previewFailed",
+  "Content fetch failed": "docs.previewFailed",
   "User not found. They must sign up / be seeded first.": "errors.userNotFound",
   "Select at least one knowledge base": "errors.selectKb",
   "No accessible knowledge bases in selection": "errors.noAccessibleKb",

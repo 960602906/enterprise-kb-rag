@@ -161,6 +161,14 @@ export const en = {
     deleted: "Deleted",
     deleteFailed: "Delete failed",
     confirmDelete: "Delete this document?",
+    preview: "Preview",
+    previewSubtitle: "Original file contents",
+    previewLoading: "Loading preview…",
+    previewFailed: "Preview failed",
+    previewUnavailable:
+      "Could not render this document in the browser. Download the file instead.",
+    download: "Download",
+    downloadAria: "Download document",
     status: {
       pending: "pending",
       processing: "processing",
@@ -394,6 +402,13 @@ export const zh: Dictionary = {
     deleted: "已删除",
     deleteFailed: "删除失败",
     confirmDelete: "确定删除该文档？",
+    preview: "预览",
+    previewSubtitle: "原始文件内容",
+    previewLoading: "正在加载预览…",
+    previewFailed: "预览失败",
+    previewUnavailable: "无法在浏览器中渲染该文档，请改为下载。",
+    download: "下载",
+    downloadAria: "下载文档",
     status: {
       pending: "待处理",
       processing: "处理中",

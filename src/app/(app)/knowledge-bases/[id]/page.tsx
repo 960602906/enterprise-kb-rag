@@ -6,6 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowLeft,
+  Download,
+  Eye,
   Loader2,
   Upload,
   Play,
@@ -37,6 +39,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  DocumentPreviewDialog,
+} from "@/components/documents/document-preview-dialog";
+import { prefersDownloadAction } from "@/lib/documents/preview";
 import { translateApiError, useI18n, type TranslateFn } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -113,6 +119,7 @@ export default function KnowledgeBaseDetailPage() {
   const [memberRole, setMemberRole] = useState<"read" | "manage">("read");
   const [addingMember, setAddingMember] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [previewDocId, setPreviewDocId] = useState<string | null>(null);
 
   const canManage = kb?.role === "manage";
 
@@ -437,6 +444,26 @@ export default function KnowledgeBaseDetailPage() {
                   <Badge variant={statusVariant[doc.status]}>
                     {statusLabel(t, doc.status)}
                   </Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPreviewDocId(doc.id)}
+                  >
+                    <Eye data-icon="inline-start" />
+                    {t("docs.preview")}
+                  </Button>
+                  {prefersDownloadAction(doc.filename) && (
+                    <Button size="sm" variant="ghost" asChild>
+                      <a
+                        href={`/api/documents/${doc.id}/content?download=1`}
+                        download={doc.filename}
+                        aria-label={t("docs.downloadAria")}
+                      >
+                        <Download data-icon="inline-start" />
+                        {t("docs.download")}
+                      </a>
+                    </Button>
+                  )}
                   {canManage &&
                     doc.status !== "ready" &&
                     doc.status !== "processing" && (
@@ -558,6 +585,14 @@ export default function KnowledgeBaseDetailPage() {
         )}
         </CardContent>
       </Card>
+
+      <DocumentPreviewDialog
+        documentId={previewDocId}
+        open={previewDocId != null}
+        onOpenChange={(open) => {
+          if (!open) setPreviewDocId(null);
+        }}
+      />
     </div>
   );
 }

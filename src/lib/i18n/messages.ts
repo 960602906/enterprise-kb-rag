@@ -179,6 +179,7 @@ export const en = {
     downloadAria: "Download document",
     status: {
       pending: "pending",
+      queued: "Queued",
       processing: "processing",
       ready: "ready",
       failed: "failed",
@@ -429,6 +430,7 @@ export const zh: Dictionary = {
     downloadAria: "下载文档",
     status: {
       pending: "待处理",
+      queued: "排队中",
       processing: "处理中",
       ready: "就绪",
       failed: "失败",

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { AccessError, requireKbAccess, requireUserId } from "@/lib/auth/acl";
 import { db } from "@/lib/db";
@@ -96,7 +97,13 @@ export async function POST(req: Request, ctx: Ctx) {
 
     const processNow = form.get("process") !== "false";
     if (processNow) {
-      enqueueDocumentProcessing(doc.id);
+      await enqueueDocumentProcessing(doc.id);
+      const [updated] = await db
+        .select()
+        .from(documents)
+        .where(eq(documents.id, doc.id))
+        .limit(1);
+      return NextResponse.json({ item: updated ?? doc }, { status: 201 });
     }
 
     return NextResponse.json({ item: doc }, { status: 201 });

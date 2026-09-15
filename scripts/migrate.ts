@@ -23,7 +23,7 @@ async function main() {
   `;
   await sql`
     DO $$ BEGIN
-      CREATE TYPE document_status AS ENUM ('pending', 'processing', 'ready', 'failed');
+      CREATE TYPE document_status AS ENUM ('pending', 'queued', 'processing', 'ready', 'failed');
     EXCEPTION WHEN duplicate_object THEN null;
     END $$;
   `;

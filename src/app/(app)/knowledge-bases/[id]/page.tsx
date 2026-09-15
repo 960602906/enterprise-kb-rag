@@ -56,7 +56,7 @@ import { prefersDownloadAction } from "@/lib/documents/preview";
 import { translateApiError, useI18n, type TranslateFn } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-type DocStatus = "pending" | "processing" | "ready" | "failed";
+type DocStatus = "pending" | "queued" | "processing" | "ready" | "failed";
 
 type DocumentItem = {
   id: string;
@@ -88,6 +88,7 @@ const statusVariant: Record<
   "secondary" | "outline" | "default" | "destructive"
 > = {
   pending: "secondary",
+  queued: "outline",
   processing: "outline",
   ready: "default",
   failed: "destructive",
@@ -97,6 +98,8 @@ function statusLabel(t: TranslateFn, status: DocStatus): string {
   switch (status) {
     case "pending":
       return t("docs.status.pending");
+    case "queued":
+      return t("docs.status.queued");
     case "processing":
       return t("docs.status.processing");
     case "ready":
@@ -184,13 +187,16 @@ export default function KnowledgeBaseDetailPage() {
 
   useEffect(() => {
     const busy = documents.some(
-      (d) => d.status === "processing" || d.status === "pending",
+      (d) =>
+        d.status === "queued" ||
+        d.status === "processing" ||
+        d.status === "pending",
     );
     if (!busy) return;
-    const t = setInterval(() => {
+    const timer = setInterval(() => {
       void load({ silent: true });
     }, 4000);
-    return () => clearInterval(t);
+    return () => clearInterval(timer);
   }, [documents, load]);
 
   async function onUpload(e: FormEvent) {
@@ -234,6 +240,12 @@ export default function KnowledgeBaseDetailPage() {
       if (!res.ok) {
         toast.error(translateApiError(t, data.error, "docs.processFailed"));
         return;
+      }
+      // Immediate feedback: badge flips to queued/processing before silent poll
+      if (data.item?.id) {
+        setDocuments((prev) =>
+          prev.map((d) => (d.id === docId ? { ...d, ...data.item } : d)),
+        );
       }
       toast.success(t("docs.processed"));
       await load({ silent: true });
@@ -551,6 +563,7 @@ export default function KnowledgeBaseDetailPage() {
                   )}
                   {canManage &&
                     doc.status !== "ready" &&
+                    doc.status !== "queued" &&
                     doc.status !== "processing" && (
                       <Button
                         type="button"

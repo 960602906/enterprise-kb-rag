@@ -1,6 +1,7 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ingestJobs } from "@/lib/db/ingest-jobs";
+import { documents } from "@/lib/db/schema";
 import { processDocument } from "@/lib/rag/ingest";
 
 export type IngestJobStatus = "queued" | "running" | "succeeded" | "failed";
@@ -19,6 +20,26 @@ function lockTtlMs(): number {
   return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_LOCK_TTL_MS;
 }
 
+/**
+ * Mark the document as waiting in the ingest queue (distinct from uploaded-pending).
+ * Only transitions from waiting/failed — never clobber processing/ready if a worker
+ * already claimed the job between enqueue and this update.
+ */
+async function markDocumentQueued(documentId: string): Promise<void> {
+  await db
+    .update(documents)
+    .set({
+      status: "queued",
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(documents.id, documentId),
+        inArray(documents.status, ["pending", "failed", "queued"]),
+      ),
+    );
+}
+
 /** Persist a job. Optionally kick an in-process run (dev default). */
 export async function enqueueDocumentProcessing(
   documentId: string,
@@ -31,8 +52,10 @@ export async function enqueueDocumentProcessing(
     .limit(1);
 
   let jobId: string;
+  let alreadyRunning = false;
   if (existing && (existing.status === "queued" || existing.status === "running")) {
     jobId = existing.id;
+    alreadyRunning = existing.status === "running";
   } else if (existing) {
     const [updated] = await db
       .update(ingestJobs)
@@ -57,6 +80,12 @@ export async function enqueueDocumentProcessing(
       })
       .returning();
     jobId = created.id;
+  }
+
+  // Durable UI signal: badge shows「排队中」as soon as Process succeeds,
+  // even before a worker claims the job. Skip when already actively running.
+  if (!alreadyRunning) {
+    await markDocumentQueued(documentId);
   }
 
   const inline = inlineIngestEnabled();
@@ -122,7 +151,7 @@ export async function reclaimStaleJobs(): Promise<number> {
     await db.execute(sql`
       UPDATE documents
       SET
-        status = 'pending',
+        status = 'queued',
         updated_at = now()
       WHERE id = ANY(${idLiteral}::uuid[])
         AND status = 'processing'
@@ -230,6 +259,10 @@ async function runClaimedJob(
         updatedAt: new Date(),
       })
       .where(eq(ingestJobs.id, jobId));
+    // processDocument already set documents.status=failed; restore queued while retrying
+    if (retry) {
+      await markDocumentQueued(documentId);
+    }
     throw err;
   }
 }

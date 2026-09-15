@@ -176,7 +176,7 @@ curl -sS -X POST https://<host>/api/ingest \
 
 Self-hosted alternative: `INGEST_WORKER_INLINE=false` and run `pnpm jobs:work` (or `pnpm jobs:work:once` from system cron).
 
-Stale `running` jobs (serverless timeout / crashed worker) are re-queued after `INGEST_LOCK_TTL_MS` (default 3 minutes). Documents stuck in `processing` go back to `pending`.
+Stale `running` jobs (serverless timeout / crashed worker) are re-queued after `INGEST_LOCK_TTL_MS` (default 3 minutes). Documents stuck in `processing` go back to `queued`.
 
 ## Architecture (dirs)
 

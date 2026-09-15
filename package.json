@@ -10,7 +10,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/migrate.ts && tsx scripts/migrate-ingest-jobs.ts",
+    "db:migrate": "tsx scripts/migrate.ts && tsx scripts/migrate-ingest-jobs.ts && tsx scripts/migrate-document-queued-status.ts",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx scripts/seed.ts",
     "db:studio": "drizzle-kit studio",

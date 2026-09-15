@@ -43,6 +43,7 @@ const tsvector = customType<{ data: string; driverData: string }>({
 export const memberRoleEnum = pgEnum("member_role", ["read", "manage"]);
 export const documentStatusEnum = pgEnum("document_status", [
   "pending",
+  "queued",
   "processing",
   "ready",
   "failed",

@@ -28,7 +28,7 @@ const zh: { title: string; subtitle: string; sections: HelpSection[] } = {
       body: [
         "支持 PDF、Markdown、TXT、DOCX。",
         "上传完必须点「处理」。状态变成「就绪」才能被检索。",
-        "生产环境处理是排队的，等一会儿刷新页面。失败可以再点一次。",
+        "生产环境会先显示「排队中」，工人开始后变成「处理中」；页面会自动刷新。失败可以再点一次。",
       ],
     },
     {
@@ -74,7 +74,7 @@ const en: { title: string; subtitle: string; sections: HelpSection[] } = {
       body: [
         "PDF, Markdown, TXT, and DOCX are supported.",
         "After upload you must click Process. Retrieval only uses documents in ready status.",
-        "Production processing is queued — refresh after a minute. Failed jobs can be retried.",
+        "In production the badge shows Queued, then processing once a worker starts — this page refreshes automatically. Failed jobs can be retried.",
       ],
     },
     {

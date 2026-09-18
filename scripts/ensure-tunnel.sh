@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
-# Ensure SSH reverse tunnel: public 115.190.128.7:43123 -> local 127.0.0.1:43123
+# Ensure SSH reverse tunnel: public host:port -> local 127.0.0.1:port
+# Requires: ATLAS_KB_REMOTE_HOST (e.g. your.vps.example)
 # Usage: ensure-tunnel.sh [--loop]
 set -euo pipefail
 
 LOG="${ATLAS_KB_TUNNEL_LOG:-/tmp/atlas-kb-tunnel.log}"
 PIDFILE="${ATLAS_KB_TUNNEL_PID:-/tmp/atlas-kb-tunnel.pid}"
-REMOTE_HOST="${ATLAS_KB_REMOTE_HOST:-115.190.128.7}"
+REMOTE_HOST="${ATLAS_KB_REMOTE_HOST:-}"
 REMOTE_USER="${ATLAS_KB_REMOTE_USER:-root}"
 REMOTE_PORT="${ATLAS_KB_PORT:-43123}"
 LOCAL_HOST="127.0.0.1"
 LOCAL_PORT="${ATLAS_KB_PORT:-43123}"
 LOOP=0
 [[ "${1:-}" == "--loop" ]] && LOOP=1
+
+if [[ -z "$REMOTE_HOST" ]]; then
+  echo "ERROR: set ATLAS_KB_REMOTE_HOST to your public SSH host (no default)." >&2
+  exit 1
+fi
 
 log() { printf '[%s] %s\n' "$(date -Is)" "$*" | tee -a "$LOG"; }
 

@@ -1,39 +1,42 @@
-# Atlas KB — production on this box
+# Atlas KB — self-hosted production helpers
 
-Public origin: `http://115.190.128.7:43123`  
-Local bind: `127.0.0.1:43123` only. The public host reverse-forwards; do not expose `:43123` on other box interfaces.
+Optional scripts for running a single-node production process on your own machine
+or VPS. They are **not** required for the Docker Compose + `pnpm` quick start.
 
-Postgres is **system postgresql 18** on `127.0.0.1:5432` (database `kb_rag`). Not Docker. Leave `MOCK_EMBEDDINGS=true` and `MOCK_CHAT=true`.
+## Environment
+
+| Variable | Purpose |
+|----------|---------|
+| `ATLAS_KB_REMOTE_HOST` | Public host for reverse-tunnel helpers (required for tunnel scripts) |
+| `ATLAS_KB_REMOTE_USER` | SSH user (default `root`) |
+| `ATLAS_KB_PORT` | App port (default `43123`) |
+| `ATLAS_KB_HOST` | Bind address for `next start` (default `127.0.0.1`) |
+
+Do **not** commit real hosts, passwords, or API keys. Copy `.env.example` → `.env.local`.
 
 ## Commands
 
 ```bash
-cd /workspace/enterprise-kb-rag
-./scripts/run-prod.sh          # load .env.local, pnpm build, pnpm/next start
-./scripts/ensure-tunnel.sh     # start SSH -R if down (or restart if stale)
-./scripts/prod-status.sh       # postgres / next / tunnel / SearchKnowledge
+# from the repo root
+./scripts/run-prod.sh          # load .env.local, pnpm build, next start
+./scripts/ensure-tunnel.sh     # SSH -R reverse tunnel (needs ATLAS_KB_REMOTE_HOST)
+./scripts/prod-status.sh       # postgres / next / tunnel / SearchKnowledge checks
 ```
 
 - Prod log / pid: `/tmp/atlas-kb-prod.log`  `/tmp/atlas-kb-prod.pid`
 - Tunnel log / pid: `/tmp/atlas-kb-tunnel.log`  `/tmp/atlas-kb-tunnel.pid`
 
-`ensure-tunnel.sh --loop` retries every 30s (optional long-running supervisor).
+`ensure-tunnel.sh --loop` retries every 30s (optional supervisor).
 
-## After box reboot
+## Typical flow after reboot
 
-1. Start postgres if needed: `sudo pg_ctlcluster 18 main start`
+1. Start Postgres (Docker Compose or your system service)
 2. `./scripts/run-prod.sh`
-3. `./scripts/ensure-tunnel.sh`
+3. Optionally `ATLAS_KB_REMOTE_HOST=your.public.host ./scripts/ensure-tunnel.sh`
 4. `./scripts/prod-status.sh`
 
-## Cron / @every (optional)
+## Notes
 
-Re-check the reverse tunnel every minute (safe if already up):
-
-```cron
-* * * * * /workspace/enterprise-kb-rag/scripts/ensure-tunnel.sh >> /tmp/atlas-kb-tunnel.cron.log 2>&1
-```
-
-Equivalent systemd-timer / watch pattern: `@every 1m` → `ensure-tunnel.sh`.
-
-Do **not** run `pnpm dev` on port 43123 while production is up. Do not kill skyroc `pnpm` / vite.
+- Prefer `INGEST_WORKER_INLINE=false` plus `pnpm jobs:work` (or Cron) in production.
+- Do **not** run `pnpm dev` on the same port while production is up.
+- Change seed passwords before exposing any public URL; set `DISABLE_REGISTER=true`.

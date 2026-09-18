@@ -1,6 +1,7 @@
 /**
- * One-off: ingest first-batch SkyRoc markdown into KB "SkyRoc Docs".
- * Corpus root: /workspace/skyroc-corpus (repo-relative paths preserved).
+ * One-off: ingest a local markdown corpus into KB "SkyRoc Docs".
+ * Set CORPUS_ROOT (or SKYROC_CORPUS_ROOT) to your corpus directory.
+ * Paths inside ENTRIES are kept relative to that root.
  */
 import { config } from "dotenv";
 import path from "path";
@@ -18,7 +19,15 @@ type CorpusEntry = {
   docType: DocType;
 };
 
-const CORPUS_ROOT = "/workspace/skyroc-corpus";
+const CORPUS_ROOT =
+  process.env.CORPUS_ROOT?.trim() ||
+  process.env.SKYROC_CORPUS_ROOT?.trim() ||
+  "";
+if (!CORPUS_ROOT) {
+  throw new Error(
+    "Set CORPUS_ROOT (or SKYROC_CORPUS_ROOT) to your local corpus directory.",
+  );
+}
 
 const ENTRIES: CorpusEntry[] = [
   ...[

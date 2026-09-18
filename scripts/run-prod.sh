@@ -8,7 +8,7 @@ LOG="${ATLAS_KB_PROD_LOG:-/tmp/atlas-kb-prod.log}"
 PIDFILE="${ATLAS_KB_PROD_PID:-/tmp/atlas-kb-prod.pid}"
 PORT="${ATLAS_KB_PORT:-43123}"
 HOST="${ATLAS_KB_HOST:-127.0.0.1}"
-APP_MARKER="/workspace/enterprise-kb-rag"
+APP_MARKER="$ROOT"
 
 export PATH="${HOME}/.local/bin:${PATH}"
 
@@ -39,7 +39,7 @@ ensure_postgres() {
   fi
 }
 
-# Stop only Atlas KB next/pnpm whose cwd is this app — never skyroc,
+# Stop only Atlas KB next/pnpm whose cwd is this app —
 # never this script / its parent (a wrapper cmdline can mention the path).
 stop_atlas_next() {
   local pids=() pid cwd cmd

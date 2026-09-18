@@ -70,19 +70,24 @@ Seed also creates **Employee Handbook** (demo) and **Internal Docs** (default Se
 
 ## 部署与运维 / Deploy & operations
 
-完整、可复制的逐步说明（本机 / 单机 VPS、Worker、HTTPS 概要、SSH 隧道、首次登录、常见故障）见：
+完整、可复制的逐步说明（本机 / 单机 VPS、Worker、HTTPS 概要、SSH 隧道、首次登录、常见故障）：
 
-**→ [DEPLOY.md](./DEPLOY.md)**（中文为主，英中对照）
+| Language | Guide |
+|----------|--------|
+| **中文部署文档** | **[DEPLOY.md](./DEPLOY.md)** |
+| **English deploy guide** | **[DEPLOY.en.md](./DEPLOY.en.md)** |
 
-| 场景 | 文档位置 |
-|------|----------|
-| 本机 Compose + migrate + seed + `pnpm dev` | [DEPLOY.md §2](./DEPLOY.md#2-本机快速启动--local-quick-start) |
-| VPS：`pnpm build && pnpm start` + `pnpm jobs:work` | [DEPLOY.md §3](./DEPLOY.md#3-单机--vps-生产部署--single-machine-production) |
-| Chat vs embeddings / DeepSeek / `MOCK_*` | [DEPLOY.md §4](./DEPLOY.md#4-对话模型-vs-向量模型--chat-vs-embeddings) |
-| 首次登录、建库、上传、`/settings/api-keys` | [DEPLOY.md §5](./DEPLOY.md#5-首次登录与日常操作--first-login--daily-ops) |
-| SearchKnowledge curl（相对路径 `/api/search-knowledge`） | [DEPLOY.md §6](./DEPLOY.md#6-searchknowledge-调用示例--api-curl) |
-| 队列卡住、401/403、migrate、隧道断开 | [DEPLOY.md §7](./DEPLOY.md#7-常见故障--common-failures) |
-| 单机脚本 `run-prod.sh` / `ensure-tunnel.sh` | [scripts/README-prod.md](./scripts/README-prod.md) |
+两份文档章节与步骤一一对应；文首互相链到 **English / 中文**。
+
+| 场景 / Topic | 中文 | English |
+|--------------|------|---------|
+| 本机 Compose + migrate + seed + `pnpm dev` | [§2](./DEPLOY.md#2-本机快速启动) | [§2](./DEPLOY.en.md#2-local-quick-start) |
+| VPS：`pnpm build && pnpm start` + `pnpm jobs:work` | [§3](./DEPLOY.md#3-单机--vps-生产部署) | [§3](./DEPLOY.en.md#3-single-machine--vps-production) |
+| Chat vs embeddings / DeepSeek / `MOCK_*` | [§4](./DEPLOY.md#4-对话模型-vs-向量模型) | [§4](./DEPLOY.en.md#4-chat-vs-embeddings) |
+| 首次登录、建库、上传、`/settings/api-keys` | [§5](./DEPLOY.md#5-首次登录与日常操作) | [§5](./DEPLOY.en.md#5-first-login--daily-ops) |
+| SearchKnowledge curl（`/api/search-knowledge`） | [§6](./DEPLOY.md#6-searchknowledge-调用示例) | [§6](./DEPLOY.en.md#6-searchknowledge-api-curl) |
+| 队列卡住、401/403、migrate、隧道断开 | [§7](./DEPLOY.md#7-常见故障) | [§7](./DEPLOY.en.md#7-common-failures) |
+| 单机脚本 `run-prod.sh` / `ensure-tunnel.sh` | [scripts/README-prod.md](./scripts/README-prod.md) | same |
 
 本项目是**开源自托管**软件：请自备机器、Postgres 与模型密钥。维护者不提供对外免费托管。  
 Self-hosted open source — bring your own host, database, and API keys. Not a free public SaaS.
@@ -185,7 +190,7 @@ Details (ACL, 403 rules, admin CRUD): see [Service SearchKnowledge](#service-sea
 
 ## Production notes / 生产简要
 
-逐步操作与故障排查请优先阅读 **[DEPLOY.md](./DEPLOY.md)**。下面仅作速查：
+逐步操作与故障排查请优先阅读 **[中文 DEPLOY.md](./DEPLOY.md)** 或 **[English DEPLOY.en.md](./DEPLOY.en.md)**。下面仅作速查：
 
 | Topic | Guidance |
 |-------|----------|
@@ -197,7 +202,7 @@ Details (ACL, 403 rules, admin CRUD): see [Service SearchKnowledge](#service-sea
 | Auth | Strong `AUTH_SECRET`; set `AUTH_URL` to your public origin |
 | Tunnel | `ATLAS_KB_REMOTE_HOST=... ./scripts/ensure-tunnel.sh`（无默认公网 IP） |
 
-**Ingest options:** (1) omit `INGEST_WORKER_INLINE` for inline/dev · (2) `pnpm jobs:work` · (3) optional `CRON_SECRET` + `/api/cron/ingest` / drain. Details: [DEPLOY.md §3.4](./DEPLOY.md#34-启动入库-worker生产必做之一).
+**Ingest options:** (1) omit `INGEST_WORKER_INLINE` for inline/dev · (2) `pnpm jobs:work` · (3) optional `CRON_SECRET` + `/api/cron/ingest` / drain. Details: [中文 §3.4](./DEPLOY.md#34-启动入库-worker生产必做之一) · [EN §3.4](./DEPLOY.en.md#34-start-the-ingest-worker-required-in-production).
 
 ---
 
@@ -335,7 +340,8 @@ Upload [`samples/employee-handbook.md`](./samples/employee-handbook.md), click *
 
 ## Contributing / License
 
-- [DEPLOY.md](./DEPLOY.md) — 部署与运维逐步指南
+- [DEPLOY.md](./DEPLOY.md) — 中文部署与运维逐步指南
+- [DEPLOY.en.md](./DEPLOY.en.md) — English deploy & operations guide
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — PRs, lint, evals
 - [SECURITY.md](./SECURITY.md) — vulnerability reporting
 - [LICENSE](./LICENSE) — MIT

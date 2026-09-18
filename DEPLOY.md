@@ -1,32 +1,35 @@
-# 部署与运维指南 / Deploy & Operations Guide
+# 部署与运维指南
+
+**English** · [English guide](./DEPLOY.en.md) · **中文**（本页）
 
 面向**初学者**的逐步说明：把 [Atlas KB](./README.md)（企业知识库 RAG）部署到本机或一台 VPS，并完成日常运维。
 
-This guide is for beginners who want to **self-host** this open-source project. It is **not** a free public SaaS — you run the app, Postgres, and bring your own LLM / embedding keys.
+本项目是**开源自托管**软件：你自己运行应用与 Postgres，并自备 LLM / 向量模型密钥。**不是**免费公有云 SaaS。
 
-> **相关文档 / Related**
+> **相关文档**
 >
 > - 快速开始：[README.md](./README.md)
+> - English deploy guide：[DEPLOY.en.md](./DEPLOY.en.md)
 > - 环境变量模板：[`.env.example`](./.env.example)
 > - 单机脚本说明：[scripts/README-prod.md](./scripts/README-prod.md)
 > - 安全报告：[SECURITY.md](./SECURITY.md)
 
 ---
 
-## 目录 / Contents
+## 目录
 
-1. [前置条件 / Prerequisites](#1-前置条件--prerequisites)
-2. [本机快速启动 / Local quick start](#2-本机快速启动--local-quick-start)
-3. [单机 / VPS 生产部署 / Single-machine production](#3-单机--vps-生产部署--single-machine-production)
-4. [对话模型 vs 向量模型 / Chat vs embeddings](#4-对话模型-vs-向量模型--chat-vs-embeddings)
-5. [首次登录与日常操作 / First login & daily ops](#5-首次登录与日常操作--first-login--daily-ops)
-6. [SearchKnowledge 调用示例 / API curl](#6-searchknowledge-调用示例--api-curl)
-7. [常见故障 / Common failures](#7-常见故障--common-failures)
-8. [运维清单 / Ops checklist](#8-运维清单--ops-checklist)
+1. [前置条件](#1-前置条件)
+2. [本机快速启动](#2-本机快速启动)
+3. [单机 / VPS 生产部署](#3-单机--vps-生产部署)
+4. [对话模型 vs 向量模型](#4-对话模型-vs-向量模型)
+5. [首次登录与日常操作](#5-首次登录与日常操作)
+6. [SearchKnowledge 调用示例](#6-searchknowledge-调用示例)
+7. [常见故障](#7-常见故障)
+8. [运维清单](#8-运维清单)
 
 ---
 
-## 1. 前置条件 / Prerequisites
+## 1. 前置条件
 
 请先确认本机或服务器已安装：
 
@@ -55,7 +58,7 @@ docker compose version
 
 ---
 
-## 2. 本机快速启动 / Local quick start
+## 2. 本机快速启动
 
 按顺序复制执行即可。
 
@@ -92,7 +95,7 @@ MOCK_EMBEDDINGS=true
 MOCK_CHAT=true
 ```
 
-真实问答请配置 API 密钥（见 [第 4 节](#4-对话模型-vs-向量模型--chat-vs-embeddings)），并保持 `MOCK_*=false`。
+真实问答请配置 API 密钥（见 [第 4 节](#4-对话模型-vs-向量模型)），并保持 `MOCK_*=false`。
 
 ### 2.3 启动 Postgres + pgvector
 
@@ -141,7 +144,7 @@ pnpm start
 
 ---
 
-## 3. 单机 / VPS 生产部署 / Single-machine production
+## 3. 单机 / VPS 生产部署
 
 适合：**一台 Linux 机器**长期跑本项目（自托管）。不要求使用任何付费托管平台。
 
@@ -316,7 +319,7 @@ ATLAS_KB_REMOTE_HOST=your.public.host ./scripts/prod-status.sh
 
 ---
 
-## 4. 对话模型 vs 向量模型 / Chat vs embeddings
+## 4. 对话模型 vs 向量模型
 
 本项目把两类能力都接到 **OpenAI 兼容** HTTP API，但职责不同：
 
@@ -367,7 +370,7 @@ MOCK_CHAT=true
 
 ---
 
-## 5. 首次登录与日常操作 / First login & daily ops
+## 5. 首次登录与日常操作
 
 ### 5.1 登录
 
@@ -387,7 +390,7 @@ MOCK_CHAT=true
 1. 打开知识库详情 → 上传 PDF / Markdown / TXT / DOCX  
    （可用仓库样例 [`samples/employee-handbook.md`](./samples/employee-handbook.md)）
 2. 点击 **Process / 处理**
-3. 状态应变为 `ready`（若一直 `queued` / `processing`，见 [第 7 节](#7-常见故障--common-failures)）
+3. 状态应变为 `ready`（若一直 `queued` / `processing`，见 [第 7 节](#7-常见故障)）
 4. 到 **Chat** 勾选该知识库提问，例如：「How many PTO days?」/「病假有几天？」
 
 ### 5.4 创建 API Key（供外部系统检索）
@@ -401,7 +404,7 @@ MOCK_CHAT=true
 
 ---
 
-## 6. SearchKnowledge 调用示例 / API curl
+## 6. SearchKnowledge 调用示例
 
 将 `{BASE}` 换成你的 Origin（本机示例：`http://localhost:43123`）。**不要**在文档或 issue 里粘贴真实密钥。
 
@@ -436,7 +439,7 @@ Body: { "query": "...", "topK": 8, "knowledgeBaseIds": ["<uuid>"] }
 
 ---
 
-## 7. 常见故障 / Common failures
+## 7. 常见故障
 
 ### 7.1 文档一直 `queued` / `pending`，不进入 `ready`
 
@@ -519,7 +522,7 @@ export ATLAS_KB_REMOTE_HOST=your.public.host
 
 ---
 
-## 8. 运维清单 / Ops checklist
+## 8. 运维清单
 
 ### 日常
 
@@ -558,7 +561,7 @@ pnpm build
 
 ---
 
-## 附录：命令速查 / Command cheat sheet
+## 附录：命令速查
 
 | 命令 | 作用 |
 |------|------|
@@ -573,4 +576,5 @@ pnpm build
 | `./scripts/ensure-tunnel.sh` | SSH 反向隧道（需 `ATLAS_KB_REMOTE_HOST`） |
 | `./scripts/prod-status.sh` | 健康检查 |
 
-更多产品说明与 API ACL 细节见 [README.md](./README.md)。
+更多产品说明与 API ACL 细节见 [README.md](./README.md)。  
+English version: [DEPLOY.en.md](./DEPLOY.en.md).

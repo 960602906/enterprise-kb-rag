@@ -1,3 +1,7 @@
+# Local Postgres + pgvector for Atlas KB newcomers.
+# Usage: docker compose up -d
+# App connects with:
+#   DATABASE_URL=postgresql://kb_rag:kb_rag@localhost:5433/kb_rag
 services:
   postgres:
     image: pgvector/pgvector:pg16

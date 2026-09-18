@@ -1,171 +1,185 @@
-# Atlas KB — Enterprise Knowledge Base Q&A (RAG)
+# Atlas KB — Enterprise Knowledge Base RAG
 
-Internal bilingual (EN / 中文) knowledge-base Q&A app: create knowledge bases, upload documents, process/embed them, then chat with **ACL-filtered retrieval** and **citations**.
+**Self-hosted open source** enterprise knowledge-base Q&A (RAG).  
+企业知识库问答（RAG）**开源自托管**项目。
+
+> **Not a free public cloud SaaS / 不是免费公有云服务**  
+> You clone this repo, bring your own Postgres, LLM/embedding keys, and host.  
+> 请自行部署；需自备数据库与模型密钥。维护者不提供对外免费托管。
 
 Stack: **Next.js App Router**, **Tailwind v4**, **shadcn/ui**, **Auth.js (next-auth v5)**, **Drizzle + pgvector**, **Vercel AI SDK**.
 
-## Product overview
+---
+
+## What you get / 功能概览
 
 | Area | What you get |
 |------|----------------|
-| Auth | Email/password login & register (disable register for production) |
-| Knowledge bases | Create, list, detail, delete (manage role) |
+| Auth | Email/password login & register (disable register in production) |
+| Knowledge bases | Create, list, detail, delete (`manage` role) |
 | Documents | Upload PDF / Markdown / TXT / DOCX → Process → `ready` |
 | Members | Add by email with `read` or `manage` |
 | Chat | Multi-KB select, streaming answers, citation side panel |
+| SearchKnowledge | Read-only retrieval API for other services (`x-api-key`) |
 
 **Core flow:** Create KB → Upload docs → Process → Chat with citations.
 
-## Setup
+Hybrid retrieval combines **vector** (embeddings) + **keyword** (FTS / `pg_trgm` for CJK), fused with **RRF** by default. Mock embeddings are for demo only — use real embeddings for quality.
 
-### 1. Install
+---
+
+## Quick start / 快速开始
+
+Prerequisites: **Node.js 22+**, **pnpm**, **Docker** (for Postgres + pgvector).
 
 ```bash
+# 1) Install
 pnpm install
 cp .env.example .env.local
-```
 
-### 2. Postgres + pgvector
+# 2) Edit .env.local — at minimum set AUTH_SECRET
+#    openssl rand -base64 32
 
-```bash
+# 3) Postgres + pgvector
 docker compose up -d
+
+# 4) Schema + demo data
+pnpm db:migrate
+pnpm db:seed
+
+# 5) Run (pick one)
+pnpm dev                          # development — http://localhost:43123
+# or production-style:
+# pnpm build && pnpm start
 ```
 
-Starts `pgvector/pgvector:pg16` on **localhost:5433** with user/password/db `kb_rag`.
+Open [http://localhost:43123](http://localhost:43123).
+
+Default seed users (**change before any public exposure** / 上线前务必修改):
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin (`manage`) | `admin@example.com` | `admin123456` |
+| Member (`read`) | `member@example.com` | `member123456` |
+
+Seed also creates **Employee Handbook** (demo) and **Internal Docs** (default SearchKnowledge target). Override with `SEED_*` / `SEARCH_KNOWLEDGE_DEFAULT_KB_NAME`.
+
+`pnpm db:migrate` enables `vector`, `pg_trgm`, and related indexes.
+
+---
+
+## Environment variables / 环境变量
+
+Full commented list: [`.env.example`](./.env.example). Never commit `.env.local`.
+
+### Required / 必填
+
+| Variable | Purpose |
+|----------|---------|
+| `DATABASE_URL` | Postgres connection string (Compose default below) |
+| `AUTH_SECRET` | Auth.js secret (`openssl rand -base64 32`) |
+| `AUTH_URL` | App origin, e.g. `http://localhost:43123` |
+
+Compose default DB:
 
 ```text
 DATABASE_URL=postgresql://kb_rag:kb_rag@localhost:5433/kb_rag
 ```
 
-### 3. Migrate & seed
-
-```bash
-pnpm db:migrate
-pnpm db:seed
-```
-
-Default seed users (override with `SEED_*`):
-
-- Admin: `admin@example.com` / `admin123456` (manage)
-- Member: `member@example.com` / `member123456` (read)
-
-Seed also creates **Employee Handbook** (demo) and **Internal Docs** (default SearchKnowledge target; override name with `SEARCH_KNOWLEDGE_DEFAULT_KB_NAME`).
-
-`pnpm db:migrate` also enables `pg_trgm` and `chunks_content_trgm_idx` (needed for CJK keyword scoring).
-
-### 4. Run
-
-```bash
-pnpm dev
-```
-
-Open [http://localhost:43123](http://localhost:43123).
-
-### Env vars
+### AI keys — required for real chat / embeddings / 真实模型
 
 | Variable | Purpose |
 |----------|---------|
-| `DATABASE_URL` | Postgres connection string |
-| `AUTH_SECRET` | Auth.js secret (`openssl rand -base64 32`) |
-| `NEXTAUTH_SECRET` | Optional alias for `AUTH_SECRET` |
-| `AUTH_URL` | App origin (e.g. `http://localhost:43123`) |
-| `OPENAI_API_KEY` | Chat + embeddings |
-| `OPENAI_BASE_URL` | Optional OpenAI-compatible gateway URL |
-| `AI_GATEWAY_API_KEY` | Optional Vercel AI Gateway key |
-| `EMBEDDING_MODEL` | Default `text-embedding-3-small` |
+| `OPENAI_API_KEY` | Chat + embeddings (OpenAI or compatible) |
+| `OPENAI_BASE_URL` | Optional OpenAI-compatible gateway (e.g. DeepSeek) |
+| `AI_GATEWAY_API_KEY` | Optional Vercel AI Gateway if `OPENAI_API_KEY` is empty |
 | `CHAT_MODEL` | Default `gpt-4o-mini` |
-| `MOCK_EMBEDDINGS` / `MOCK_CHAT` | Local demo without API keys |
-| `UPLOAD_DIR` / `MAX_UPLOAD_BYTES` | Upload storage |
-| `STORAGE_DRIVER` | `local` (default) or `s3` |
-| `SEED_*` | Seed admin/member credentials |
-| `DISABLE_REGISTER` | Block `/api/register` when `true` |
-| `CRON_SECRET` | Bearer token for Vercel Cron / drain (`INGEST_CRON_SECRET` alias) |
-| `INGEST_WORKER_INLINE` | `true` to process in-request (dev default); `false` in production |
-| `INGEST_BATCH_SIZE` | Docs per drain tick (default 3 on Cron, 10 on CLI worker) |
-| `INGEST_LOCK_TTL_MS` | Reclaim `running` jobs after this many ms (default 180000) |
-| `RETRIEVAL_FUSION` | `rrf` (default) or `weighted` |
-| `RETRIEVAL_RRF_K` | RRF constant (default 60) |
-| `RETRIEVAL_TRGM_MIN_SIMILARITY` | CJK / fuzzy keyword floor (default 0.35) |
-| `SEARCH_KNOWLEDGE_API_KEY` | Service SearchKnowledge header `x-api-key` |
-| `SEARCH_KNOWLEDGE_KB_IDS` | Comma-separated KB UUID allowlist for that key |
-| `SEARCH_KNOWLEDGE_DEFAULT_KB_NAME` | Used when the request omits ids and KB_IDS is unset (default `Internal Docs`) |
-| `SEARCH_KNOWLEDGE_ALLOW_ALL` | Unsafe hatch to scan every KB; keep `false` |
-| `SYNONYM_CONFIG_PATH` | Retrieval synonym bags (default `config/retrieval-synonyms.json`) |
-| `EVAL_QUERIES_PATH` | `pnpm eval:retrieval` fixture file |
-
-## Retrieval synonyms
-
-Hybrid keyword retrieval expands queries from JSON bags, not hard-coded product terms.
-
-- Default file: [`config/retrieval-synonyms.json`](./config/retrieval-synonyms.json) (generic leave / handbook terms)
-- Domain overlays: [`config/examples/`](./config/examples/) — copy bags into the default file or set `SYNONYM_CONFIG_PATH`
-- Loaded by `extractKeywordTerms` → `expandSynonymTerms`
-
-```json
-{
-  "version": 1,
-  "bags": [
-    { "id": "leave-pto", "match": "PTO|年假", "terms": ["PTO", "leave", "年假"] }
-  ]
-}
-```
-
-`match` is a case-insensitive JS regex. Invalid bags are skipped at load time.
-
-## Hybrid retrieval
-
-1. Vector candidates: cosine distance on `chunks.embedding`
-2. Keyword candidates: english `tsvector` **unless** the query is CJK-heavy (then FTS is skipped). CJK / fuzzy matches use `pg_trgm` `word_similarity` plus ILIKE bigrams.
-3. Fusion: **RRF** by default (`score = w / (k + rank)` per list). Set `RETRIEVAL_FUSION=weighted` for the old min-max mix.
-
-Knobs live in [`config/retrieval.json`](./config/retrieval.json).
-
-## OpenAI or Vercel AI Gateway keys
+| `EMBEDDING_MODEL` | Default `text-embedding-3-small` |
 
 **OpenAI**
 
 1. Create a key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 2. Set `OPENAI_API_KEY` in `.env.local`
-3. Optionally set `CHAT_MODEL` / `EMBEDDING_MODEL`
 
-**Vercel AI Gateway**
+**DeepSeek / OpenAI-compatible**
 
-1. Enable AI Gateway in your Vercel team and create a key
-2. Set `AI_GATEWAY_API_KEY` (and optionally `OPENAI_BASE_URL`)
-3. Clients fall back to the gateway key when `OPENAI_API_KEY` is empty
+```bash
+OPENAI_API_KEY=sk-...
+OPENAI_BASE_URL=https://api.deepseek.com/v1   # example — check vendor docs
+CHAT_MODEL=deepseek-chat
+```
 
-Without keys, set `MOCK_CHAT=true` and `MOCK_EMBEDDINGS=true` for deterministic local answers.
+Embeddings must hit a provider that exposes an embeddings API. If your chat vendor has no embeddings endpoint, keep a separate OpenAI/Gateway key for `EMBEDDING_MODEL`, or temporarily use mocks (demo only).
 
-## Deploy on Vercel (Neon / Supabase)
+**Mock mode (demo only / 仅演示)**
 
-1. Create a **pgvector-enabled** Postgres database:
-   - [Neon](https://neon.tech): enable the `vector` and `pg_trgm` extensions (or run `pnpm db:migrate`)
-   - [Supabase](https://supabase.com): `create extension if not exists vector; create extension if not exists pg_trgm;`
-2. Set `DATABASE_URL` (pooled URL for the app; direct URL for migrations if needed)
-3. Set `AUTH_SECRET`, `AUTH_URL` (production URL), and model keys
-4. Run `pnpm db:migrate` against the remote DB
-5. Deploy the Next.js app; set `STORAGE_DRIVER=s3` for multi-instance uploads
-6. Production ingest (required — serverless has no long-lived `pnpm jobs:work`):
-   - `INGEST_WORKER_INLINE=false`
-   - `CRON_SECRET` (Vercel sends `Authorization: Bearer $CRON_SECRET`)
-   - `DISABLE_REGISTER=true`
-   - Keep [`vercel.json`](./vercel.json) cron: `GET /api/cron/ingest` every minute
+```bash
+MOCK_EMBEDDINGS=true
+MOCK_CHAT=true
+```
 
-> Disk uploads work for MVP / single-node. On Vercel, use S3-compatible object storage.
->
-> Vercel Hobby only allows one cron per day. Pro (or a box running `pnpm jobs:work`) is required for timely processing.
+Deterministic local answers with **no API spend**. Retrieval quality will be weak — **recommend real embeddings** for anything beyond a smoke test.
 
-### Production ingest checklist
+### Optional / 可选
 
-| Must set | Why |
-|----------|-----|
-| `STORAGE_DRIVER=s3` + bucket creds | Vercel filesystem is ephemeral |
-| `INGEST_WORKER_INLINE=false` | Do not embed inside the upload/process request |
-| `CRON_SECRET` | Protects `/api/cron/ingest` and `POST /api/ingest { "drain": true }` |
-| `DISABLE_REGISTER=true` | Block public sign-up |
-| `SEARCH_KNOWLEDGE_ALLOW_ALL=false` | No implicit all-KB service reads |
+| Variable | Purpose |
+|----------|---------|
+| `DISABLE_REGISTER` | `true` blocks `/api/register` (recommended in production) |
+| `STORAGE_DRIVER` | `local` (default) or `s3` |
+| `UPLOAD_DIR` / `MAX_UPLOAD_BYTES` | Local upload storage |
+| `INGEST_WORKER_INLINE` | `false` in production; use Cron or `pnpm jobs:work` |
+| `CRON_SECRET` | Bearer for `/api/cron/ingest` and drain |
+| `SEARCH_KNOWLEDGE_*` | Legacy env key for SearchKnowledge (prefer UI keys) |
+| `SEARCH_KNOWLEDGE_ALLOW_ALL` | **Keep `false`** |
+| `SEED_*` | Seed admin/member credentials |
+| `ALLOWED_DEV_ORIGINS` | Comma-separated hosts for HMR behind a proxy |
 
-Manual drain (same secret):
+---
+
+## SearchKnowledge API / 外部检索接口
+
+Read-only retrieval for other services. Callers must treat snippets as **context only**.
+
+### Preferred: multi API keys in the UI
+
+1. Sign in as a user who can **manage** the target knowledge base(s).
+2. Open **[Settings → API keys](http://localhost:43123/settings/api-keys)** (`/settings/api-keys`).
+3. Create a key, bind KB UUID(s), copy the secret **once**.
+4. The page includes a beginner **How to use / 使用示范** guide with `{BASE}/api/search-knowledge` examples.
+
+### Call example
+
+```bash
+curl -sS -X POST http://localhost:43123/api/search-knowledge \
+  -H "content-type: application/json" \
+  -H "x-api-key: $ATLAS_SEARCH_API_KEY" \
+  -d '{"query":"How many PTO days?","topK":8,"knowledgeBaseIds":["<kb-uuid>"]}'
+```
+
+Legacy env key `SEARCH_KNOWLEDGE_API_KEY` still works. Keep `SEARCH_KNOWLEDGE_ALLOW_ALL=false`. DB-issued keys **never** use ALLOW_ALL.
+
+Details (ACL, 403 rules, admin CRUD): see [Service SearchKnowledge](#service-searchknowledge) below.
+
+---
+
+## Production notes / 生产简要
+
+| Topic | Guidance |
+|-------|----------|
+| Register | `DISABLE_REGISTER=true` |
+| Secrets | Change seed passwords; never commit `.env.local` |
+| ALLOW_ALL | Keep `SEARCH_KNOWLEDGE_ALLOW_ALL=false` |
+| Ingest | `INGEST_WORKER_INLINE=false` + Cron **or** `pnpm jobs:work` |
+| Storage | Multi-instance / serverless → `STORAGE_DRIVER=s3` |
+| Auth | Strong `AUTH_SECRET`; set `AUTH_URL` to your public origin |
+
+**Ingest options**
+
+1. **Inline (dev):** omit `INGEST_WORKER_INLINE` — process inside the request.
+2. **Worker:** `INGEST_WORKER_INLINE=false` and run `pnpm jobs:work` (or `pnpm jobs:work:once` from system cron).
+3. **Vercel Cron:** `CRON_SECRET` + [`vercel.json`](./vercel.json) → `GET /api/cron/ingest`.
+
+Manual drain:
 
 ```bash
 curl -sS -X POST https://<host>/api/ingest \
@@ -174,9 +188,62 @@ curl -sS -X POST https://<host>/api/ingest \
   -d '{"drain":true,"limit":3}'
 ```
 
-Self-hosted alternative: `INGEST_WORKER_INLINE=false` and run `pnpm jobs:work` (or `pnpm jobs:work:once` from system cron).
+Optional single-node helpers: [`scripts/README-prod.md`](./scripts/README-prod.md) (`run-prod.sh`, tunnel helpers). They require **your** `ATLAS_KB_REMOTE_HOST` — no hardcoded public IPs.
 
-Stale `running` jobs (serverless timeout / crashed worker) are re-queued after `INGEST_LOCK_TTL_MS` (default 3 minutes). Documents stuck in `processing` go back to `queued`.
+Deploy on Neon / Supabase pgvector: enable `vector` + `pg_trgm`, set `DATABASE_URL`, migrate, deploy the Next.js app.
+
+---
+
+## Eval / reproducibility / 评测复现
+
+After migrate + seed (CI uses the same flow):
+
+```bash
+# Unit checks (no DB)
+pnpm eval:unit
+pnpm eval:api-keys
+
+# DB golden path (needs Postgres + seed)
+pnpm eval:ingest-sample    # ingest samples/employee-handbook.md
+pnpm eval:retrieval        # config/eval-queries.json
+
+# Lint / types
+pnpm lint
+pnpm typecheck
+```
+
+Custom fixtures:
+
+```bash
+EVAL_QUERIES_PATH=config/examples/skyroc-eval-queries.json pnpm eval:retrieval
+```
+
+CI workflow: [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) — lint, typecheck, unit evals, then migrate → seed → ingest-sample → retrieval with `MOCK_EMBEDDINGS=true`.
+
+---
+
+## Docker Compose / 数据库
+
+[`docker-compose.yml`](./docker-compose.yml) starts **Postgres 16 + pgvector** only (enough for newcomers):
+
+```bash
+docker compose up -d
+docker compose ps   # healthy on localhost:5433
+```
+
+No full app image is required — run the Next.js app with `pnpm` on the host.
+
+---
+
+## Security defaults / 安全默认
+
+- `SEARCH_KNOWLEDGE_ALLOW_ALL=false`
+- `MOCK_*` default `false` in `.env.example` (enable only for local demo)
+- Change `SEED_*` passwords before exposing the app
+- Never commit API keys, `.env.local`, or private hosts
+- Report vulnerabilities via [SECURITY.md](./SECURITY.md) — **do not** paste secrets in issues
+
+---
 
 ## Architecture (dirs)
 
@@ -184,6 +251,7 @@ Stale `running` jobs (serverless timeout / crashed worker) are re-queued after `
 src/app/(auth)/login          Login / register
 src/app/(app)/knowledge-bases KB list, create, detail
 src/app/(app)/chat            Multi-KB RAG chat + citations
+src/app/(app)/settings        Settings + API keys UI
 src/app/api/                  REST + streaming chat + SearchKnowledge
 src/app/api/cron/ingest       Vercel Cron drain worker
 src/lib/auth                  Auth.js + ACL helpers
@@ -198,124 +266,73 @@ samples/                      Sample docs for testing
 
 ## UI language (zh / en)
 
-Chrome (nav, forms, buttons, statuses, toasts) is localized with a small dictionary + React context. Preference is stored in the `atlas-locale` cookie (and localStorage), default **zh**. Uploaded documents and RAG model answers are **not** translated.
+Chrome (nav, forms, buttons, statuses, toasts) is localized. Preference: `atlas-locale` cookie (default **zh**). Uploaded documents and model answers are **not** auto-translated.
 
-To add a string:
-
-1. Add the same key under both `en` and `zh` in [`src/lib/i18n/messages.ts`](./src/lib/i18n/messages.ts)
-2. In a client component: `const { t } = useI18n()` then `{t("section.key")}`
-3. Interpolate with `{name}` placeholders, e.g. `t("docs.chunks", { count: 12 })`
+Add strings in [`src/lib/i18n/messages.ts`](./src/lib/i18n/messages.ts) under both `en` and `zh`, then `const { t } = useI18n()`.
 
 ## ACL before retrieve
 
-Chat and ingest **filter permitted knowledge-base IDs before retrieval**. Never retrieve-then-filter — that can leak snippets across tenants. Membership roles (`read` / `manage`) gate upload, process, member admin, and delete.
+Chat and ingest **filter permitted knowledge-base IDs before retrieval**. Never retrieve-then-filter. Membership roles (`read` / `manage`) gate upload, process, member admin, and delete.
+
+## Retrieval synonyms
+
+Hybrid keyword retrieval expands queries from JSON bags:
+
+- Default: [`config/retrieval-synonyms.json`](./config/retrieval-synonyms.json)
+- Domain overlays: [`config/examples/`](./config/examples/)
+- Knobs: [`config/retrieval.json`](./config/retrieval.json)
+
+## Hybrid retrieval
+
+1. Vector candidates: cosine distance on `chunks.embedding`
+2. Keyword: english `tsvector` unless CJK-heavy (then FTS skipped); CJK / fuzzy via `pg_trgm`
+3. Fusion: **RRF** by default; `RETRIEVAL_FUSION=weighted` for min-max mix
+
+---
 
 ## Service SearchKnowledge
-
-Read-only retrieval API for other services (e.g. SkyRoc). Callers must treat returned snippets as **context only** — do not invent procedures, field values, ticket IDs, or database writes that are not in the snippets.
 
 ### Multi-tenant guarantees
 
 | Guarantee | Behavior |
 |-----------|----------|
-| DB key ↔ KB bind | Reads are **only** the key’s bound `knowledgeBaseIds` (ACL before retrieve) |
-| Foreign `knowledgeBaseIds` | **403** if *any* requested id is outside the bind (including all-foreign). No silent drop. |
+| DB key ↔ KB bind | Reads are **only** the key’s bound `knowledgeBaseIds` |
+| Foreign `knowledgeBaseIds` | **403** if any requested id is outside the bind |
 | Unbound DB key | **403** — default-deny |
 | Disabled / unknown key | **401** |
-| `SEARCH_KNOWLEDGE_ALLOW_ALL` | **Never** applies to DB keys. Legacy env path only; in **production** also requires `SEARCH_KNOWLEDGE_ALLOW_ALL_IN_PRODUCTION=true` |
-| Admin key APIs | Session required; bind/list/update only for KBs the user can `manage` (manage on **all** bound KBs to see/edit a key) |
-| Cross-tenant list leak | Listing never returns other tenants’ keys or KB ids the user cannot manage |
+| `SEARCH_KNOWLEDGE_ALLOW_ALL` | **Never** for DB keys; legacy env path only; production also needs `SEARCH_KNOWLEDGE_ALLOW_ALL_IN_PRODUCTION=true` |
 
-### Auth (multi-key)
+### Auth lookup order
 
-Pass `x-api-key` on every request. Lookup order:
+1. **DB API key** (preferred) — Settings → API keys; hashed at rest (`API_KEY_PEPPER` or `AUTH_SECRET`)
+2. **Legacy env key** — `SEARCH_KNOWLEDGE_API_KEY`
+3. Missing key → **401** (development: localhost-only without key logs a warning)
 
-1. **DB API key** (preferred) — create under **Settings → API keys** (the page includes a beginner **How to use** / **使用示范** guide with relative `{BASE}/api/search-knowledge` examples). Each key is hashed at rest (`SHA-256` of pepper + secret; pepper = `API_KEY_PEPPER` or `AUTH_SECRET`) and bound to one or more knowledge bases.
-2. **Legacy env key** — `SEARCH_KNOWLEDGE_API_KEY` still works so existing SkyRoc deploys keep working without a day-one migration. Scope uses `SEARCH_KNOWLEDGE_KB_IDS` / default KB name / gated `ALLOW_ALL`.
-3. Missing `x-api-key` returns **401**; development allows **localhost only** without a key and logs a warning.
-
-Successful DB-key requests log `keyId` (never the secret) and update `last_used_at`.
-
-### Resolve which KBs are searched
-
-**DB key:**
-
-1. Zero bindings → **403**
-2. Request includes any unbound id → **403**
-3. Else search the requested ids (all must be bound), or all bound ids if omitted
-
-**Legacy env key** (SkyRoc-compatible; treat ALLOW_ALL as unsafe):
-
-1. Request `knowledgeBaseIds` ∩ `SEARCH_KNOWLEDGE_KB_IDS` (if the allowlist is set)
-2. Else the allowlist itself
-3. Else the KB named `SEARCH_KNOWLEDGE_DEFAULT_KB_NAME` (default `Internal Docs`)
-4. Else every KB **only if** `SEARCH_KNOWLEDGE_ALLOW_ALL=true` (and in production also `SEARCH_KNOWLEDGE_ALLOW_ALL_IN_PRODUCTION=true`)
-
-### Call
-
-```bash
-# DB-issued key (from Settings → API keys)
-curl -sS -X POST http://localhost:43123/api/search-knowledge \
-  -H "content-type: application/json" \
-  -H "x-api-key: $ATLAS_SEARCH_API_KEY" \
-  -d '{"query":"How many PTO days?","topK":8,"knowledgeBaseIds":["<kb-uuid>"]}'
-
-# Legacy env key (SkyRoc today)
-curl -sS -X POST http://localhost:43123/api/search-knowledge \
-  -H "content-type: application/json" \
-  -H "x-api-key: $SEARCH_KNOWLEDGE_API_KEY" \
-  -d '{"query":"How many PTO days?","topK":8}'
-```
-
-`GET /api/search-knowledge?query=...&topK=8&docTypes=flow,faq&knowledgeBaseIds=<uuid>` is also supported.
-
-| Field | Notes |
-|-------|--------|
-| `query` | Required |
-| `topK` | Optional, 1–50 (default 8) |
-| `docTypes` | Optional `flow` \| `rule` \| `faq`. Untagged chunks stay eligible |
-| `knowledgeBaseIds` | Optional; DB keys: must all be bound or request 403s |
-
-Response: `{ "items": [{ "title", "snippet", "sourcePath", "score", "docType"? }] }`.
-
-This route does **not** stream chat or call the LLM. Existing `/api/chat` RAG is unchanged. Upload/chat/admin document APIs are **not** opened to API keys.
-
-### Admin API (session + manage role)
+### Admin API (session + manage)
 
 | Method | Path | Notes |
 |--------|------|--------|
-| `GET` | `/api/api-keys` | List keys (prefix only) + manageable KBs |
-| `POST` | `/api/api-keys` | Create; returns plaintext **once** |
-| `PATCH` | `/api/api-keys/:id` | Update name / enabled / bound KBs |
+| `GET` | `/api/api-keys` | List keys (prefix only) |
+| `POST` | `/api/api-keys` | Create; plaintext **once** |
+| `PATCH` | `/api/api-keys/:id` | Update |
 | `DELETE` | `/api/api-keys/:id` | Revoke |
-| `POST` | `/api/api-keys/:id/rotate` | New secret; old one stops working |
+| `POST` | `/api/api-keys/:id/rotate` | Rotate secret |
 
-You may only bind knowledge bases you can `manage`. Listing requires manage on **every** KB bound to the key. UI: `/settings/api-keys`.
+UI: `/settings/api-keys`.
 
-### Migrating SkyRoc off the env key
+Response shape: `{ "items": [{ "title", "snippet", "sourcePath", "score", "docType"? }] }`. This route does **not** call the LLM.
 
-1. Sign in as a user who can manage the target KB(s).
-2. **Settings → API keys → New key**, bind the same KB UUID(s) SkyRoc uses today.
-3. Copy the plaintext secret once into SkyRoc’s `x-api-key` config.
-4. Confirm search works, then remove `SEARCH_KNOWLEDGE_API_KEY` from Atlas when ready.
+### Sample document
 
-### Chunking defaults
+Upload [`samples/employee-handbook.md`](./samples/employee-handbook.md), click **Process**, ask “How many PTO days?” / “病假有几天？”
 
-See [`src/lib/rag/chunk-config.ts`](./src/lib/rag/chunk-config.ts):
+## Contributing / License
 
-- Target window **400–800 tokens**, overlap **~100**
-- Prefer markdown headings; for `docType=flow`, also split on `步骤` / `Step N` / numbered steps
-- Chunk metadata: `docType`, `sourcePath`, `title` (inferred from path/filename or upload form fields `docType` / `sourcePath`)
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — PRs, lint, evals
+- [SECURITY.md](./SECURITY.md) — vulnerability reporting
+- [LICENSE](./LICENSE) — MIT
 
-## Sample document
+## Roadmap (optional)
 
-Upload [`samples/employee-handbook.md`](./samples/employee-handbook.md) (bilingual PTO policy), click **Process**, then ask in Chat e.g. “How many PTO days?” / “病假有几天？”
-
-```bash
-pnpm eval:retrieval
-```
-
-## TODOs
-
-- [ ] **SSO / OIDC** — Okta, Azure AD / Entra, Google Workspace; map groups → `kb_members` roles; set `DISABLE_REGISTER=true`
-- [ ] **Connectors** — Notion / 飞书 / Confluence sync into knowledge bases
+- [ ] **SSO / OIDC** — Okta, Azure AD / Entra; map groups → roles; `DISABLE_REGISTER=true`
+- [ ] **Connectors** — Notion / 飞书 / Confluence sync

@@ -3,6 +3,8 @@
 Optional scripts for running a single-node production process on your own machine
 or VPS. They are **not** required for the Docker Compose + `pnpm` quick start.
 
+For the full beginner deploy & ops guide (Chinese-first), see **[DEPLOY.md](../DEPLOY.md)**.
+
 ## Environment
 
 | Variable | Purpose |

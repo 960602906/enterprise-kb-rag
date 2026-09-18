@@ -68,6 +68,27 @@ Seed also creates **Employee Handbook** (demo) and **Internal Docs** (default Se
 
 ---
 
+## 部署与运维 / Deploy & operations
+
+完整、可复制的逐步说明（本机 / 单机 VPS、Worker、HTTPS 概要、SSH 隧道、首次登录、常见故障）见：
+
+**→ [DEPLOY.md](./DEPLOY.md)**（中文为主，英中对照）
+
+| 场景 | 文档位置 |
+|------|----------|
+| 本机 Compose + migrate + seed + `pnpm dev` | [DEPLOY.md §2](./DEPLOY.md#2-本机快速启动--local-quick-start) |
+| VPS：`pnpm build && pnpm start` + `pnpm jobs:work` | [DEPLOY.md §3](./DEPLOY.md#3-单机--vps-生产部署--single-machine-production) |
+| Chat vs embeddings / DeepSeek / `MOCK_*` | [DEPLOY.md §4](./DEPLOY.md#4-对话模型-vs-向量模型--chat-vs-embeddings) |
+| 首次登录、建库、上传、`/settings/api-keys` | [DEPLOY.md §5](./DEPLOY.md#5-首次登录与日常操作--first-login--daily-ops) |
+| SearchKnowledge curl（相对路径 `/api/search-knowledge`） | [DEPLOY.md §6](./DEPLOY.md#6-searchknowledge-调用示例--api-curl) |
+| 队列卡住、401/403、migrate、隧道断开 | [DEPLOY.md §7](./DEPLOY.md#7-常见故障--common-failures) |
+| 单机脚本 `run-prod.sh` / `ensure-tunnel.sh` | [scripts/README-prod.md](./scripts/README-prod.md) |
+
+本项目是**开源自托管**软件：请自备机器、Postgres 与模型密钥。维护者不提供对外免费托管。  
+Self-hosted open source — bring your own host, database, and API keys. Not a free public SaaS.
+
+---
+
 ## Environment variables / 环境变量
 
 Full commented list: [`.env.example`](./.env.example). Never commit `.env.local`.
@@ -164,33 +185,19 @@ Details (ACL, 403 rules, admin CRUD): see [Service SearchKnowledge](#service-sea
 
 ## Production notes / 生产简要
 
+逐步操作与故障排查请优先阅读 **[DEPLOY.md](./DEPLOY.md)**。下面仅作速查：
+
 | Topic | Guidance |
 |-------|----------|
 | Register | `DISABLE_REGISTER=true` |
 | Secrets | Change seed passwords; never commit `.env.local` |
 | ALLOW_ALL | Keep `SEARCH_KNOWLEDGE_ALLOW_ALL=false` |
-| Ingest | `INGEST_WORKER_INLINE=false` + Cron **or** `pnpm jobs:work` |
+| Ingest | `INGEST_WORKER_INLINE=false` + `pnpm jobs:work`（或 Cron） |
 | Storage | Multi-instance / serverless → `STORAGE_DRIVER=s3` |
 | Auth | Strong `AUTH_SECRET`; set `AUTH_URL` to your public origin |
+| Tunnel | `ATLAS_KB_REMOTE_HOST=... ./scripts/ensure-tunnel.sh`（无默认公网 IP） |
 
-**Ingest options**
-
-1. **Inline (dev):** omit `INGEST_WORKER_INLINE` — process inside the request.
-2. **Worker:** `INGEST_WORKER_INLINE=false` and run `pnpm jobs:work` (or `pnpm jobs:work:once` from system cron).
-3. **Vercel Cron:** `CRON_SECRET` + [`vercel.json`](./vercel.json) → `GET /api/cron/ingest`.
-
-Manual drain:
-
-```bash
-curl -sS -X POST https://<host>/api/ingest \
-  -H "authorization: Bearer $CRON_SECRET" \
-  -H "content-type: application/json" \
-  -d '{"drain":true,"limit":3}'
-```
-
-Optional single-node helpers: [`scripts/README-prod.md`](./scripts/README-prod.md) (`run-prod.sh`, tunnel helpers). They require **your** `ATLAS_KB_REMOTE_HOST` — no hardcoded public IPs.
-
-Deploy on Neon / Supabase pgvector: enable `vector` + `pg_trgm`, set `DATABASE_URL`, migrate, deploy the Next.js app.
+**Ingest options:** (1) omit `INGEST_WORKER_INLINE` for inline/dev · (2) `pnpm jobs:work` · (3) optional `CRON_SECRET` + `/api/cron/ingest` / drain. Details: [DEPLOY.md §3.4](./DEPLOY.md#34-启动入库-worker生产必做之一).
 
 ---
 
@@ -328,6 +335,7 @@ Upload [`samples/employee-handbook.md`](./samples/employee-handbook.md), click *
 
 ## Contributing / License
 
+- [DEPLOY.md](./DEPLOY.md) — 部署与运维逐步指南
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — PRs, lint, evals
 - [SECURITY.md](./SECURITY.md) — vulnerability reporting
 - [LICENSE](./LICENSE) — MIT
